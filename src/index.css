@@ -9,6 +9,10 @@ body,
   margin: 0;
   height: 100%;
   overflow: hidden;
+  /* The map is always the light "day" style (cream land), so paint the page cream too. Without an
+     explicit background, iOS falls back to a black backdrop in dark mode and it shows through the
+     home-indicator safe area as a black bar in the installed (standalone) PWA. */
+  background-color: #f5f1e8;
 }
 
 .status-badge {
