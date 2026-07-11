@@ -25,3 +25,11 @@ export interface StationStatus {
 export interface Station extends StationInfo {
   status: StationStatus | null;
 }
+
+/** A selected search result — a place the user picked as their destination. */
+export interface POI {
+  name: string;
+  placeFormatted: string;
+  lat: number;
+  lon: number;
+}

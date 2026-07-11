@@ -1,18 +1,19 @@
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
-import type { Station } from "../types";
+import type { POI, Station } from "../types";
 import { STATION_CIRCLE_COLOR, STATION_LAYER_ID, STATION_SOURCE_ID, stationsToGeoJSON } from "./stationLayer";
 import { useMapboxMap } from "./useMapboxMap";
 
 interface MapViewProps {
   stations: Station[];
+  destination: POI | null;
 }
 
-export function MapView({ stations }: MapViewProps) {
+export function MapView({ stations, destination }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { mapRef, isLoaded } = useMapboxMap(containerRef);
-  const popupRef = useRef<mapboxgl.Popup | null>(null);
+  const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Add the station source/layer once the map has loaded.
   useEffect(() => {
@@ -36,11 +37,18 @@ export function MapView({ stations }: MapViewProps) {
       },
     });
 
-    const popup = new mapboxgl.Popup({ closeButton: false, offset: 10 });
-    popupRef.current = popup;
-
-    map.on("mouseenter", STATION_LAYER_ID, (e) => {
+    // Cursor feedback on hover (desktop only — touch devices have no hover, which is fine,
+    // the tap-to-open-popup below works on both).
+    map.on("mouseenter", STATION_LAYER_ID, () => {
       map.getCanvas().style.cursor = "pointer";
+    });
+    map.on("mouseleave", STATION_LAYER_ID, () => {
+      map.getCanvas().style.cursor = "";
+    });
+
+    // Tap/click opens a popup (works with mouse clicks and touch taps alike).
+    // closeOnClick (default true) dismisses it when tapping elsewhere on the map.
+    map.on("click", STATION_LAYER_ID, (e) => {
       const feature = e.features?.[0];
       if (!feature || feature.geometry.type !== "Point") return;
       const { name, bikesAvailable, docksAvailable } = feature.properties as {
@@ -48,14 +56,10 @@ export function MapView({ stations }: MapViewProps) {
         bikesAvailable: number;
         docksAvailable: number;
       };
-      popup
+      new mapboxgl.Popup({ closeButton: true, offset: 10 })
         .setLngLat(feature.geometry.coordinates as [number, number])
         .setHTML(`<strong>${name}</strong><br/>${bikesAvailable} bikes · ${docksAvailable} docks`)
         .addTo(map);
-    });
-    map.on("mouseleave", STATION_LAYER_ID, () => {
-      map.getCanvas().style.cursor = "";
-      popup.remove();
     });
   }, [isLoaded, mapRef]);
 
@@ -66,6 +70,26 @@ export function MapView({ stations }: MapViewProps) {
     const source = map.getSource(STATION_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
     source?.setData(stationsToGeoJSON(stations));
   }, [stations, isLoaded, mapRef]);
+
+  // Drop/move a marker on the selected search destination and fly there.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+
+    if (!destination) {
+      destinationMarkerRef.current?.remove();
+      destinationMarkerRef.current = null;
+      return;
+    }
+
+    const lngLat: [number, number] = [destination.lon, destination.lat];
+    if (!destinationMarkerRef.current) {
+      destinationMarkerRef.current = new mapboxgl.Marker({ color: "#1976d2" }).setLngLat(lngLat).addTo(map);
+    } else {
+      destinationMarkerRef.current.setLngLat(lngLat);
+    }
+    map.flyTo({ center: lngLat, zoom: 15 });
+  }, [destination, isLoaded, mapRef]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }

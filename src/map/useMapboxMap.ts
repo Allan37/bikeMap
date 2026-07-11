@@ -21,6 +21,7 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     map.addControl(new mapboxgl.NavigationControl(), "top-right");
     map.on("load", () => setIsLoaded(true));
     mapRef.current = map;
+    if (import.meta.env.DEV) (window as any).__debugMap = map; // dev-only inspection hook
 
     return () => {
       map.remove();
