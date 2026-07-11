@@ -36,6 +36,23 @@ export function MapView({ stations, destination }: MapViewProps) {
         "circle-stroke-color": "#ffffff",
       },
     });
+    // Overlay a white "x" on dead stations (0 bikes and 0 docks) — a redundant signal on
+    // top of color alone, so it's not just "which shade of dark is this" at a glance.
+    map.addLayer({
+      id: `${STATION_LAYER_ID}-dead-marker`,
+      type: "symbol",
+      source: STATION_SOURCE_ID,
+      filter: ["==", ["get", "availability"], "dead"],
+      layout: {
+        "text-field": "✕",
+        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 6, 16, 12],
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: {
+        "text-color": "#ffffff",
+      },
+    });
 
     // Cursor feedback on hover (desktop only — touch devices have no hover, which is fine,
     // the tap-to-open-popup below works on both).
@@ -51,14 +68,18 @@ export function MapView({ stations, destination }: MapViewProps) {
     map.on("click", STATION_LAYER_ID, (e) => {
       const feature = e.features?.[0];
       if (!feature || feature.geometry.type !== "Point") return;
-      const { name, bikesAvailable, docksAvailable } = feature.properties as {
+      const { name, bikesAvailable, ebikesAvailable, docksAvailable } = feature.properties as {
         name: string;
         bikesAvailable: number;
+        ebikesAvailable: number;
         docksAvailable: number;
       };
+      const standardBikes = bikesAvailable - ebikesAvailable;
+      const bikesLabel =
+        ebikesAvailable > 0 ? `${bikesAvailable} bikes (${standardBikes} standard, ${ebikesAvailable} electric)` : `${bikesAvailable} bikes`;
       new mapboxgl.Popup({ closeButton: true, offset: 10 })
         .setLngLat(feature.geometry.coordinates as [number, number])
-        .setHTML(`<strong>${name}</strong><br/>${bikesAvailable} bikes · ${docksAvailable} docks`)
+        .setHTML(`<strong>${name}</strong><br/>${bikesLabel} · ${docksAvailable} docks`)
         .addTo(map);
     });
   }, [isLoaded, mapRef]);

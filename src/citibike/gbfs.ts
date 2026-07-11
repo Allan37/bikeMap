@@ -12,6 +12,7 @@ interface RawStationInformation {
 interface RawStationStatus {
   station_id: string;
   num_bikes_available: number;
+  num_ebikes_available: number;
   num_docks_available: number;
   is_renting: number; // GBFS booleans are 0/1
   is_returning: number;
@@ -41,6 +42,7 @@ export async function fetchStationStatus(): Promise<StationStatus[]> {
   return body.data.stations.map((s) => ({
     stationId: s.station_id,
     bikesAvailable: s.num_bikes_available,
+    ebikesAvailable: s.num_ebikes_available,
     docksAvailable: s.num_docks_available,
     isRenting: s.is_renting === 1,
     isReturning: s.is_returning === 1,

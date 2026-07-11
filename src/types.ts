@@ -16,6 +16,8 @@ export interface StationInfo {
 export interface StationStatus {
   stationId: string;
   bikesAvailable: number;
+  /** Subset of bikesAvailable that are e-bikes; the rest are classic/standard bikes. */
+  ebikesAvailable: number;
   docksAvailable: number;
   isRenting: boolean;
   isReturning: boolean;
