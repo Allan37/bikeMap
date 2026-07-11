@@ -9,8 +9,19 @@ export const GBFS_BASE_URL = "https://gbfs.lyft.com/gbfs/1.1/bkn/en";
 export const STATION_INFORMATION_URL = `${GBFS_BASE_URL}/station_information.json`;
 export const STATION_STATUS_URL = `${GBFS_BASE_URL}/station_status.json`;
 
-/** How often to re-poll live station status. GBFS itself refreshes roughly every 30-60s. */
-export const STATION_STATUS_POLL_INTERVAL_MS = 30_000;
+/**
+ * How often to re-poll live station status. Empirically confirmed (repeated HEAD requests
+ * watching `last-modified`) that Citibike's GBFS feed regenerates server-side on a flat
+ * 60-second cycle — polling faster than that cannot get fresher data, it just re-downloads
+ * the same ~1MB snapshot. There's no API quota to worry about (it's a static file behind
+ * CloudFront, not a metered API), so the tradeoff is purely bandwidth/battery vs. how
+ * quickly a new snapshot gets picked up:
+ * - Idle (just browsing, no active trip): loose poll, most of that ~1MB is wasted anyway.
+ * - Active (destination + location both set — about to depart): tight poll, so a fresh
+ *   snapshot lands within 15s rather than up to 30s of it actually updating server-side.
+ */
+export const STATION_STATUS_POLL_INTERVAL_IDLE_MS = 45_000;
+export const STATION_STATUS_POLL_INTERVAL_ACTIVE_MS = 15_000;
 
 /** Default map center — NYC, roughly Manhattan. Overridden by geolocation once available. */
 export const DEFAULT_MAP_CENTER: [number, number] = [-73.98, 40.75];

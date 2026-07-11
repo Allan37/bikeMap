@@ -79,7 +79,7 @@ export function MapView({ stations, destination, selectedRoute, onLocate }: MapV
       };
       const standardBikes = bikesAvailable - ebikesAvailable;
       const bikesLabel =
-        ebikesAvailable > 0 ? `${bikesAvailable} bikes (${standardBikes} standard, ${ebikesAvailable} electric)` : `${bikesAvailable} bikes`;
+        ebikesAvailable > 0 ? `${bikesAvailable} bikes (${standardBikes}⚙️ ${ebikesAvailable}⚡)` : `${bikesAvailable} bikes`;
       new mapboxgl.Popup({ closeButton: true, offset: 10 })
         .setLngLat(feature.geometry.coordinates as [number, number])
         .setHTML(`<strong>${name}</strong><br/>${bikesLabel} · ${docksAvailable} docks`)

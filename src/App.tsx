@@ -7,16 +7,23 @@ import { SearchBar } from "./search/SearchBar";
 import type { Coordinates, POI, RouteOption } from "./types";
 
 function App() {
-  const { stations, lastUpdated, error } = useStations();
-  const stationsRef = useRef(stations);
-  stationsRef.current = stations;
-
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
   const [destination, setDestination] = useState<POI | null>(null);
 
-  // Dev convenience: set a location manually without needing real GPS or to be in NYC.
-  // e.g. window.__setUserLocation({ lat: 40.75, lon: -73.99 })
-  if (import.meta.env.DEV) (window as any).__setUserLocation = setUserLocation;
+  // Both set means the user is actively looking at a trip, about to depart — worth polling
+  // station data harder for. See config.ts for why this doesn't just mean "poll as fast as
+  // possible."
+  const isActivelyRouting = userLocation !== null && destination !== null;
+  const { stations, lastUpdated, error } = useStations(isActivelyRouting);
+  const stationsRef = useRef(stations);
+  stationsRef.current = stations;
+
+  // Dev convenience: set location/destination manually, without needing real GPS or the
+  // search UI. e.g. window.__setUserLocation({ lat: 40.75, lon: -73.99 })
+  if (import.meta.env.DEV) {
+    (window as any).__setUserLocation = setUserLocation;
+    (window as any).__setDestination = setDestination;
+  }
 
   const [routeOptions, setRouteOptions] = useState<RouteOption[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
