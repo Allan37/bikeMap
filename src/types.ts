@@ -55,3 +55,18 @@ export interface RouteOption {
   walkFromStation: RouteLeg;
   totalDurationSeconds: number;
 }
+
+/** A Yelp business match for a selected destination, for the Apple-Maps-style POI card. */
+export interface YelpBusiness {
+  id: string;
+  name: string;
+  rating: number;
+  reviewCount: number;
+  price: string | null;
+  categories: string[];
+  imageUrl: string | null;
+  isOpenNow: boolean | null;
+  address: string;
+  phone: string | null;
+  yelpUrl: string;
+}

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { useStations } from "./citibike/useStations";
 import { MapView } from "./map/MapView";
+import { PoiCard } from "./poi/PoiCard";
+import { searchNearby } from "./poi/yelpClient";
 import { getBestRoutes } from "./routing/candidateSearch";
 import { RoutePanel } from "./routePanel/RoutePanel";
 import { SearchBar } from "./search/SearchBar";
-import type { Coordinates, POI, RouteOption } from "./types";
+import type { Coordinates, POI, RouteOption, YelpBusiness } from "./types";
 
 function App() {
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -29,6 +31,9 @@ function App() {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+
+  const [poiBusiness, setPoiBusiness] = useState<YelpBusiness | null>(null);
+  const [isPoiCardDismissed, setIsPoiCardDismissed] = useState(false);
 
   // Recompute candidate routes whenever the user picks a new destination or their location
   // updates — deliberately NOT on every 30s station-data poll tick (reads stationsRef
@@ -59,6 +64,25 @@ function App() {
     };
   }, [userLocation, destination]);
 
+  // Look up a Yelp match for the selected destination (name + location), for the POI card.
+  useEffect(() => {
+    setPoiBusiness(null);
+    setIsPoiCardDismissed(false);
+    if (!destination) return;
+    let cancelled = false;
+    searchNearby(destination.lat, destination.lon, destination.name)
+      .then((results) => {
+        if (cancelled) return;
+        setPoiBusiness(results[0] ?? null);
+      })
+      .catch((err) => {
+        console.error("Yelp search failed:", err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [destination]);
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <MapView
@@ -68,6 +92,7 @@ function App() {
         onLocate={setUserLocation}
       />
       <SearchBar onSelect={setDestination} />
+      {poiBusiness && !isPoiCardDismissed && <PoiCard business={poiBusiness} onClose={() => setIsPoiCardDismissed(true)} />}
       <RoutePanel
         options={routeOptions}
         selectedIndex={selectedIndex}
