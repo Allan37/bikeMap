@@ -87,6 +87,10 @@ Washington Square Park.
   UI, pulsing accuracy-circle dot, continuous tracking) instead of a
   hand-rolled `hooks/useGeolocation.ts`; more robust, less code to maintain
 - [x] Installable PWA, works on your phone's home screen
+- [ ] Custom origin — right now "start" is always live GPS. Eventually want a
+  second search input ("From:") that defaults to current location but can
+  be overridden with any searched place, reusing the same SearchBar/
+  mapboxSearch infra already built for the destination. Not urgent.
 - [ ] POI ratings/reviews (Yelp) — not built yet, `search/mapboxSearch.ts`
   covers plain place search but the `poi/` module (Yelp proxy + business
   cards) from the architecture sketch hasn't been started
