@@ -3,7 +3,19 @@ import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
 import type { Coordinates, POI, RouteOption, Station } from "../types";
 import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
-import { STATION_CIRCLE_COLOR, STATION_LAYER_ID, STATION_SOURCE_ID, stationsToGeoJSON } from "./stationLayer";
+import {
+  NORMAL_LABEL_MINZOOM,
+  PRIORITY_LABEL_MINZOOM,
+  STATION_CIRCLE_COLOR,
+  STATION_LABEL_NORMAL_FILTER,
+  STATION_LABEL_NORMAL_LAYER_ID,
+  STATION_LABEL_PRIORITY_FILTER,
+  STATION_LABEL_PRIORITY_LAYER_ID,
+  STATION_LABEL_TEXT_FIELD,
+  STATION_LAYER_ID,
+  STATION_SOURCE_ID,
+  stationsToGeoJSON,
+} from "./stationLayer";
 import { useMapboxMap } from "./useMapboxMap";
 
 interface MapViewProps {
@@ -11,6 +23,8 @@ interface MapViewProps {
   destination: POI | null;
   /** A custom trip start, shown as a green marker. Null when starting from the live GPS dot. */
   origin: POI | null;
+  /** Live GPS location; drives which stations get the earlier, lower-zoom count labels. */
+  userLocation: Coordinates | null;
   selectedRoute: RouteOption | null;
   onLocate: (position: Coordinates) => void;
   onLocateError?: (message: string) => void;
@@ -23,6 +37,7 @@ export function MapView({
   stations,
   destination,
   origin,
+  userLocation,
   selectedRoute,
   onLocate,
   onLocateError,
@@ -76,6 +91,36 @@ export function MapView({
         "text-color": "#ffffff",
       },
     });
+
+    // Count labels: bikes normally, open docks ("12 P") near the destination. Two layers so the
+    // stations near you or your destination surface their label at a lower zoom than the rest.
+    // Wrapped defensively: these are enrichment, and must never take down the core map/route layers.
+    try {
+      for (const [id, filter, minzoom] of [
+        [STATION_LABEL_NORMAL_LAYER_ID, STATION_LABEL_NORMAL_FILTER, NORMAL_LABEL_MINZOOM] as const,
+        [STATION_LABEL_PRIORITY_LAYER_ID, STATION_LABEL_PRIORITY_FILTER, PRIORITY_LABEL_MINZOOM] as const,
+      ]) {
+        map.addLayer({
+          id,
+          type: "symbol",
+          source: STATION_SOURCE_ID,
+          minzoom,
+          filter,
+          layout: {
+            "text-field": STATION_LABEL_TEXT_FIELD,
+            "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 13],
+            "text-allow-overlap": false,
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "rgba(0, 0, 0, 0.65)",
+            "text-halo-width": 1.4,
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("[bikeMap] station count labels failed to initialize", err);
+    }
 
     // Cursor feedback on hover (desktop only — touch devices have no hover, which is fine,
     // the tap-to-open-popup below works on both).
@@ -132,8 +177,9 @@ export function MapView({
     const map = mapRef.current;
     if (!map || !isLoaded) return;
     const source = map.getSource(STATION_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
-    source?.setData(stationsToGeoJSON(stations));
-  }, [stations, isLoaded, mapRef]);
+    const destinationCoords = destination ? { lat: destination.lat, lon: destination.lon } : null;
+    source?.setData(stationsToGeoJSON(stations, userLocation, destinationCoords));
+  }, [stations, userLocation, destination, isLoaded, mapRef]);
 
   // Drop/move a marker on the selected search destination and fly there.
   useEffect(() => {

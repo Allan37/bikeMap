@@ -143,6 +143,7 @@ function App() {
         stations={stations}
         destination={destination}
         origin={origin}
+        userLocation={userLocation}
         selectedRoute={bestRoute}
         onLocate={(position) => {
           setUserLocation(position);
