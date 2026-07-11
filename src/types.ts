@@ -35,3 +35,23 @@ export interface POI {
   lat: number;
   lon: number;
 }
+
+export interface RouteLeg {
+  mode: "walk" | "bike";
+  durationSeconds: number;
+  distanceMeters: number;
+  /** Null only for an estimated bike leg that hasn't been refined with a real Directions call yet. */
+  geometry: GeoJSON.LineString | null;
+  /** True for a straight-line-distance estimate rather than a real routed Directions API result. */
+  estimated: boolean;
+}
+
+/** One ranked way to get from A to B: walk to a station, bike, walk the rest. */
+export interface RouteOption {
+  originStation: Station;
+  destinationStation: Station;
+  walkToStation: RouteLeg;
+  bikeLeg: RouteLeg;
+  walkFromStation: RouteLeg;
+  totalDurationSeconds: number;
+}

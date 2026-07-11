@@ -43,41 +43,53 @@ mixed bike+transit commutes.
   convention) with zero extra config, auto-deploys on push to GitHub, free
   tier covers this comfortably.
 
-## Core problem to solve: the station-picking algorithm
+## Core problem to solve: the station-picking algorithm — BUILT
 
-This is the actual value-add over stock Apple/Google Maps — they don't know
-which stations have bikes right now. Rough v1 approach, open for discussion:
+Implemented in `src/routing/`. Real approach (superseded the original sketch
+below it):
 
-1. Given start point A and destination B, pull nearby stations around each
-   from the static station list (say, top N by walking distance).
-2. Filter live: origin candidates need `num_bikes_available > 0` (probably
-   with a small buffer, e.g. >1, since a bike can disappear between page
-   load and arrival), destination candidates need `num_docks_available > 0`.
-3. Score each (origin station, destination station) pair by total estimated
-   time: walk(A→station1) + bike(station1→station2) + walk(station2→B).
-   Rank, show best 1-3 options — not just nearest station, since nearest
-   might be empty or might not minimize total trip time.
-4. Fallback when no viable station pair exists nearby (e.g. everything's
-   empty/full): probably just surface a plain walking route and say so,
-   rather than failing silently.
+1. Given start point A and destination B, find the nearest
+   `CANDIDATE_STATION_COUNT` (3) stations to each with live availability
+   (`bikesAvailable > 0` near A, `docksAvailable > 0` near B) — cheap,
+   straight-line distance, no API calls (`candidateSearch.findNearbyStations`).
+2. Fetch real Mapbox Directions for every leg, including the bike leg for
+   every candidate pair — not a straight-line estimate. At N=3 that's
+   3+3+9=15 Directions calls per search, trivial against the 100k/month free
+   tier, and it actually models the street network (one-way streets,
+   bridges, avenue loops) instead of guessing — this matters in a grid city
+   where straight-line distance undercounts "loop around the block" trips.
+   A straight-line estimate (`scoring.estimateBikeLeg`) only kicks in as a
+   per-pair fallback if that specific Directions call fails.
+3. Rank by total walk+bike+walk time, surface top `MAX_ROUTE_OPTIONS` (3).
+4. No viable station pair (nothing nearby has bikes, or nothing near the
+   destination has a dock): `getBestRoutes` returns `[]`, `RoutePanel` shows
+   an explicit "no viable route" message rather than failing silently.
 
-**Open questions:**
-- How many candidate stations per side (N) — 3? 5? tradeoff between API call
-  volume and route quality.
-- Buffer/threshold for "has a bike" — exact availability can lag the feed by
-  up to a minute; do we pad the threshold or just accept some staleness?
-- Live re-routing: if you're mid-walk and your target station empties out,
-  do we re-check and re-suggest? (Probably a v1.1 concern, not v1.)
-- Do we ever want manual override (user picks a specific station instead of
-  the algorithm's top pick)?
+Verified end-to-end against live data and the real Directions API (not
+mocked) — real trip: 14/15/16 min ranked options from Penn Station area to
+Washington Square Park.
+
+**Resolved open questions:**
+- Candidate count: 3 per side, tunable via `CANDIDATE_STATION_COUNT`.
+- Availability buffer: none added — `> 0` as-is. Real Directions calls per
+  pair already make wrong/stale rankings cheap to get right next poll cycle;
+  didn't seem worth the complexity yet.
+- Live re-routing and manual station override: still not built, still
+  reasonable v1.1+ concerns, not blocking.
 
 ## Phases
 
 **v1 — Citibike-aware point-to-point routing**
-- Map view with live station markers (color/label by bikes & docks available)
-- Enter/tap a destination, get back the best station-pair route per above
-- Render the 3-leg route (walk / bike / walk) with ETA
-- Installable PWA, works on your phone's home screen
+- [x] Map view with live station markers (color/label by bikes & docks available)
+- [x] Enter/tap a destination, get back the best station-pair route per above
+- [x] Render the 3-leg route (walk / bike / walk) with ETA
+- [x] Live user location — used Mapbox's built-in `GeolocateControl` (permission
+  UI, pulsing accuracy-circle dot, continuous tracking) instead of a
+  hand-rolled `hooks/useGeolocation.ts`; more robust, less code to maintain
+- [x] Installable PWA, works on your phone's home screen
+- [ ] POI ratings/reviews (Yelp) — not built yet, `search/mapboxSearch.ts`
+  covers plain place search but the `poi/` module (Yelp proxy + business
+  cards) from the architecture sketch hasn't been started
 
 **v2 — Mixed bike + subway commutes**
 - Pull in MTA GTFS (static, for station locations/routes) + GTFS-realtime

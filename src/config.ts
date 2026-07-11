@@ -33,3 +33,12 @@ export const MAP_STYLE_CONFIG = {
     colorRoads: "#ffffff",
   },
 } as const;
+
+/**
+ * How many nearest-with-availability stations to consider per side when ranking routes.
+ * Directions API calls scale with N (walk legs), not N² — see routing/candidateSearch.ts.
+ */
+export const CANDIDATE_STATION_COUNT = 3;
+
+/** How many ranked route options to surface to the user. */
+export const MAX_ROUTE_OPTIONS = 3;

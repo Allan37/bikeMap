@@ -93,6 +93,57 @@ body,
   font-size: 13px;
 }
 
+.route-panel {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(48px + env(safe-area-inset-bottom));
+  z-index: 2;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.route-panel-status {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #16171d;
+  font-size: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.route-option {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+  padding: 10px 14px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  font: inherit;
+}
+
+.route-option-selected {
+  border-color: #2e7d32;
+}
+
+.route-option-time {
+  color: #16171d;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.route-option-detail {
+  color: #6b6375;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 @media (prefers-color-scheme: dark) {
   .status-badge {
     background: rgba(22, 23, 29, 0.9);
@@ -109,6 +160,16 @@ body,
   }
 
   .suggestion-name {
+    color: #f3f4f6;
+  }
+
+  .route-panel-status,
+  .route-option {
+    background: rgba(30, 31, 38, 0.95);
+  }
+
+  .route-panel-status,
+  .route-option-time {
     color: #f3f4f6;
   }
 }

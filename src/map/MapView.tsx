@@ -1,18 +1,21 @@
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
-import type { POI, Station } from "../types";
+import type { Coordinates, POI, RouteOption, Station } from "../types";
+import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
 import { STATION_CIRCLE_COLOR, STATION_LAYER_ID, STATION_SOURCE_ID, stationsToGeoJSON } from "./stationLayer";
 import { useMapboxMap } from "./useMapboxMap";
 
 interface MapViewProps {
   stations: Station[];
   destination: POI | null;
+  selectedRoute: RouteOption | null;
+  onLocate: (position: Coordinates) => void;
 }
 
-export function MapView({ stations, destination }: MapViewProps) {
+export function MapView({ stations, destination, selectedRoute, onLocate }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { mapRef, isLoaded } = useMapboxMap(containerRef);
+  const { mapRef, isLoaded } = useMapboxMap(containerRef, onLocate);
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   // Add the station source/layer once the map has loaded.
@@ -82,6 +85,24 @@ export function MapView({ stations, destination }: MapViewProps) {
         .setHTML(`<strong>${name}</strong><br/>${bikesLabel} · ${docksAvailable} docks`)
         .addTo(map);
     });
+
+    // Route line source/layer — walk legs dashed, bike leg solid, styled distinctly so the
+    // three-part trip reads at a glance. Added empty; populated by the effect below.
+    map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: EMPTY_ROUTE_GEOJSON });
+    map.addLayer(
+      {
+        id: ROUTE_LAYER_ID,
+        type: "line",
+        source: ROUTE_SOURCE_ID,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": ["match", ["get", "mode"], "bike", "#2e7d32", "#1976d2"],
+          "line-width": 4,
+          "line-dasharray": ["case", ["==", ["get", "mode"], "walk"], ["literal", [2, 2]], ["literal", [1, 0]]],
+        },
+      },
+      STATION_LAYER_ID, // insert below the station dots so they stay tappable/visible on top
+    );
   }, [isLoaded, mapRef]);
 
   // Push updated live data into the source whenever `stations` changes.
@@ -111,6 +132,30 @@ export function MapView({ stations, destination }: MapViewProps) {
     }
     map.flyTo({ center: lngLat, zoom: 15 });
   }, [destination, isLoaded, mapRef]);
+
+  // Draw the selected route's legs and fit the map to show the whole trip.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+    const source = map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+    if (!source) return;
+
+    if (!selectedRoute) {
+      source.setData(EMPTY_ROUTE_GEOJSON);
+      return;
+    }
+
+    const geojson = routeOptionToGeoJSON(selectedRoute);
+    source.setData(geojson);
+
+    const bounds = new mapboxgl.LngLatBounds();
+    geojson.features.forEach((feature) => {
+      feature.geometry.coordinates.forEach((coord) => bounds.extend(coord as [number, number]));
+    });
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, { padding: 60 });
+    }
+  }, [selectedRoute, isLoaded, mapRef]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }
