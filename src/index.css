@@ -24,6 +24,35 @@ body,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
+/* Our own live-location dot (mapbox's built-in one is disabled via showUserLocation:false). */
+.user-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 3px solid #ffffff;
+  box-shadow:
+    0 0 0 2px rgba(26, 115, 232, 0.35),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Sits below the search bar and away from the bottom-right locate button it describes. */
+.locate-error {
+  position: absolute;
+  top: calc(72px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 3;
+  max-width: 420px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(211, 47, 47, 0.95);
+  color: #fff;
+  font-size: 13px;
+  white-space: pre-line; /* render the "\n" before the [diag …] line as a line break */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
 .search-bar {
   position: absolute;
   top: calc(12px + env(safe-area-inset-top));
@@ -183,64 +212,231 @@ body,
   margin-top: 4px;
 }
 
-.poi-card-yelp-link {
-  display: inline-block;
+.poi-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-top: 10px;
+}
+
+.poi-card-yelp-link,
+.poi-card-maps-link {
+  display: inline-block;
   color: #1976d2;
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
 }
 
-.route-panel {
+/* Bottom sheet: destination summary → "Directions" → editable From/To + route options. */
+.trip-panel {
   position: absolute;
   left: 12px;
   right: 12px;
   bottom: calc(48px + env(safe-area-inset-bottom));
   z-index: 2;
   max-width: 420px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.route-panel-status {
-  padding: 12px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  color: #16171d;
-  font-size: 14px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+.trip-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-.route-option {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  text-align: left;
-  padding: 10px 14px;
-  border: 2px solid transparent;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
-  cursor: pointer;
-  font: inherit;
-}
-
-.route-option-selected {
-  border-color: #2e7d32;
-}
-
-.route-option-time {
+.trip-panel-title {
   color: #16171d;
   font-size: 18px;
+  font-weight: 700;
+}
+
+.trip-panel-close {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: #16171d;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.trip-panel-subtitle {
+  color: #6b6375;
+  font-size: 13px;
+  margin-top: -6px;
+}
+
+.trip-directions-button {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  background: #2e7d32;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.trip-endpoints {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.trip-endpoint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.02);
+  border: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  font: inherit;
+  text-align: left;
+}
+
+.trip-endpoint:last-child {
+  border-bottom: none;
+}
+
+.trip-endpoint-editable {
+  cursor: pointer;
+}
+
+.trip-endpoint-label {
+  flex: none;
+  width: 40px;
+  color: #6b6375;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.trip-endpoint-value {
+  flex: 1;
+  color: #16171d;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.trip-endpoint-edit {
+  flex: none;
+  color: #1976d2;
+  font-size: 13px;
   font-weight: 600;
 }
 
-.route-option-detail {
+.trip-origin-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trip-panel-status {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.04);
+  color: #16171d;
+  font-size: 14px;
+}
+
+.trip-panel-hint {
+  padding: 0;
+  background: transparent;
+  color: #6b6375;
+  font-size: 13px;
+  text-align: center;
+}
+
+.route-best {
+  padding: 10px 12px;
+  border: 2px solid #2e7d32;
+  border-radius: 12px;
+  background: rgba(46, 125, 50, 0.08);
+}
+
+.route-best-time {
+  color: #16171d;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.route-best-detail {
   color: #6b6375;
   font-size: 12px;
   margin-top: 2px;
+}
+
+.trip-go-button {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border-radius: 12px;
+  background: #2e7d32;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* Start-location editor: a top overlay reusing the place-search input. */
+.origin-editor {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top));
+  left: 12px;
+  right: 12px;
+  z-index: 5;
+  max-width: 420px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.origin-editor-search {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  flex: 1;
+  max-width: none;
+}
+
+.origin-editor-cancel {
+  flex: none;
+  padding: 14px 12px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1976d2;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+}
+
+.search-leading-option .suggestion-name {
+  color: #1976d2;
+  font-weight: 600;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -262,14 +458,48 @@ body,
     color: #f3f4f6;
   }
 
-  .route-panel-status,
-  .route-option {
-    background: rgba(30, 31, 38, 0.95);
+  .trip-panel {
+    background: rgba(30, 31, 38, 0.97);
   }
 
-  .route-panel-status,
-  .route-option-time {
+  .trip-panel-title,
+  .route-best-time {
     color: #f3f4f6;
+  }
+
+  .trip-panel-close {
+    background: rgba(255, 255, 255, 0.14);
+    color: #f3f4f6;
+  }
+
+  .trip-endpoints {
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  .trip-endpoint {
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .trip-endpoint-value {
+    color: #f3f4f6;
+  }
+
+  .trip-panel-status {
+    background: rgba(255, 255, 255, 0.06);
+    color: #f3f4f6;
+  }
+
+  .trip-panel-hint {
+    background: transparent;
+  }
+
+  .route-best {
+    background: rgba(46, 125, 50, 0.16);
+  }
+
+  .origin-editor-cancel {
+    background: rgba(30, 31, 38, 0.95);
   }
 
   .poi-card {

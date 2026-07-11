@@ -9,14 +9,34 @@ import { useMapboxMap } from "./useMapboxMap";
 interface MapViewProps {
   stations: Station[];
   destination: POI | null;
+  /** A custom trip start, shown as a green marker. Null when starting from the live GPS dot. */
+  origin: POI | null;
   selectedRoute: RouteOption | null;
   onLocate: (position: Coordinates) => void;
+  onLocateError?: (message: string) => void;
+  onPoiSelect?: (poi: POI) => void;
+  /** Hands App a function to programmatically trigger geolocation (for the "Use current location" button). */
+  onLocateReady?: (locate: () => void) => void;
 }
 
-export function MapView({ stations, destination, selectedRoute, onLocate }: MapViewProps) {
+export function MapView({
+  stations,
+  destination,
+  origin,
+  selectedRoute,
+  onLocate,
+  onLocateError,
+  onPoiSelect,
+  onLocateReady,
+}: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { mapRef, isLoaded } = useMapboxMap(containerRef, onLocate);
+  const { mapRef, isLoaded, locate } = useMapboxMap(containerRef, { onLocate, onLocateError, onPoiSelect });
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
+
+  useEffect(() => {
+    onLocateReady?.(locate);
+  }, [locate, onLocateReady]);
 
   // Add the station source/layer once the map has loaded.
   useEffect(() => {
@@ -80,7 +100,9 @@ export function MapView({ stations, destination, selectedRoute, onLocate }: MapV
       const standardBikes = bikesAvailable - ebikesAvailable;
       const bikesLabel =
         ebikesAvailable > 0 ? `${bikesAvailable} bikes (${standardBikes}⚙️ ${ebikesAvailable}⚡)` : `${bikesAvailable} bikes`;
-      new mapboxgl.Popup({ closeButton: true, offset: 10 })
+      // No close button — it's a fiddly tap target on mobile; tapping elsewhere (closeOnClick,
+      // on by default) dismisses the popup instead.
+      new mapboxgl.Popup({ closeButton: false, offset: 10 })
         .setLngLat(feature.geometry.coordinates as [number, number])
         .setHTML(`<strong>${name}</strong><br/>${bikesLabel} · ${docksAvailable} docks`)
         .addTo(map);
@@ -132,6 +154,26 @@ export function MapView({ stations, destination, selectedRoute, onLocate }: MapV
     }
     map.flyTo({ center: lngLat, zoom: 15 });
   }, [destination, isLoaded, mapRef]);
+
+  // Green marker for a custom trip start. Starting from the live GPS location instead shows the
+  // built-in blue geolocate dot, so no marker is drawn in that case.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+
+    if (!origin) {
+      originMarkerRef.current?.remove();
+      originMarkerRef.current = null;
+      return;
+    }
+
+    const lngLat: [number, number] = [origin.lon, origin.lat];
+    if (!originMarkerRef.current) {
+      originMarkerRef.current = new mapboxgl.Marker({ color: "#2e7d32" }).setLngLat(lngLat).addTo(map);
+    } else {
+      originMarkerRef.current.setLngLat(lngLat);
+    }
+  }, [origin, isLoaded, mapRef]);
 
   // Draw the selected route's legs and fit the map to show the whole trip.
   useEffect(() => {

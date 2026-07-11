@@ -16,6 +16,10 @@ function Stars({ rating }: { rating: number }) {
 }
 
 export function PoiCard({ business, onClose }: PoiCardProps) {
+  // Prefer a precise pin from Yelp's coordinates; fall back to a name+address query.
+  const appleMapsUrl = business.coordinates
+    ? `https://maps.apple.com/?q=${encodeURIComponent(business.name)}&ll=${business.coordinates.lat},${business.coordinates.lon}`
+    : `https://maps.apple.com/?q=${encodeURIComponent(`${business.name} ${business.address}`)}`;
   return (
     <div className="poi-card">
       <button type="button" className="poi-card-close" onClick={onClose} aria-label="Close">
@@ -40,9 +44,14 @@ export function PoiCard({ business, onClose }: PoiCardProps) {
         </div>
         <div className="poi-card-address">{business.address}</div>
         {business.phone && <div className="poi-card-phone">{business.phone}</div>}
-        <a className="poi-card-yelp-link" href={business.yelpUrl} target="_blank" rel="noreferrer">
-          View on Yelp →
-        </a>
+        <div className="poi-card-actions">
+          <a className="poi-card-yelp-link" href={business.yelpUrl} target="_blank" rel="noreferrer">
+            View on Yelp →
+          </a>
+          <a className="poi-card-maps-link" href={appleMapsUrl} target="_blank" rel="noreferrer">
+            Open in Apple Maps →
+          </a>
+        </div>
       </div>
     </div>
   );

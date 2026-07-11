@@ -3,8 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/icons/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="Citibike-aware routing: live station availability baked into every trip." />
+    <!-- Run edge-to-edge with no Safari chrome once added to the Home Screen. black-translucent
+         lets the map fill under the status bar / home indicator; our UI already pads for the
+         safe-area insets, so nothing important hides behind them. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="bikeMap" />
+    <meta name="theme-color" content="#f5f1e8" />
     <title>bikeMap</title>
   </head>
   <body>

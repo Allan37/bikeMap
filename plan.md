@@ -8,6 +8,8 @@ that actually has bikes, ride, dock at a station near the destination that
 actually has space, walk the rest. Later: fold in NYC subway/train data for
 mixed bike+transit commutes.
 
+Emphasis on staying under FREE API limits on mapbox, yelp, etc. 
+
 ## Decisions so far
 
 - **Platform: PWA**, not native iOS. No $99/yr Apple Developer Program, no

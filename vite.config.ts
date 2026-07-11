@@ -41,6 +41,11 @@ export default defineConfig(({ mode }) => {
   process.env.YELP_API_KEY = env.YELP_API_KEY
 
   return {
+    server: {
+      // Vite 8 rejects requests whose Host header isn't recognized. Allow the
+      // cloudflared quick-tunnel domain so phone testing over the https URL works.
+      allowedHosts: ['.trycloudflare.com'],
+    },
     plugins: [
       react(),
       yelpProxyDevMiddleware(),

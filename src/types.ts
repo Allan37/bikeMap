@@ -69,4 +69,8 @@ export interface YelpBusiness {
   address: string;
   phone: string | null;
   yelpUrl: string;
+  /** Business location, when Yelp provides it — used for the "Open in Apple Maps" pin. */
+  coordinates: Coordinates | null;
+  /** Meters from the searched point, per Yelp — used to break ties when matching. */
+  distance: number | null;
 }
