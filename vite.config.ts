@@ -1,7 +1,24 @@
+import { execSync } from 'node:child_process'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { searchYelpBusinesses } from './api/_yelpProxy.ts'
+
+// A short build identifier shown in-app (top-left) so you can verify you're on the latest deploy.
+// Vercel exposes the commit SHA as an env var; locally we read git; time makes dev rebuilds distinct.
+function buildId(): string {
+  const sha =
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ??
+    (() => {
+      try {
+        return execSync('git rev-parse --short HEAD').toString().trim()
+      } catch {
+        return 'dev'
+      }
+    })()
+  const time = new Date().toISOString().slice(5, 16).replace('T', ' ') // MM-DD HH:MM (UTC)
+  return `${sha} · ${time}`
+}
 
 // Mounts the same Yelp proxy logic as api/yelp-search.ts (the real Vercel function) so
 // `npm run dev` works end-to-end without needing `vercel dev` or a linked Vercel project.
@@ -41,6 +58,9 @@ export default defineConfig(({ mode }) => {
   process.env.YELP_API_KEY = env.YELP_API_KEY
 
   return {
+    define: {
+      __BUILD_ID__: JSON.stringify(buildId()),
+    },
     server: {
       // Vite 8 rejects requests whose Host header isn't recognized. Allow the
       // cloudflared quick-tunnel domain so phone testing over the https URL works.

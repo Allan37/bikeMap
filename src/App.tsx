@@ -200,6 +200,7 @@ function App() {
             ? `data ${formatAge(now - lastUpdated.getTime())} old`
             : "Loading…"}
       </div>
+      <div className="debug-badge">{__BUILD_ID__}</div>
     </div>
   );
 }

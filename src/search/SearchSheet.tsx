@@ -117,7 +117,14 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
             autoCapitalize="none"
             spellCheck={false}
             enterKeyHint="search"
-            onFocus={() => setFocused(true)}
+            onFocus={() => {
+              setFocused(true);
+              // iOS scrolls the whole page up to reveal a focused field even when it's already at
+              // the top; snap the window back (now and after the keyboard animates) to counter it.
+              const toTop = () => window.scrollTo(0, 0);
+              requestAnimationFrame(toTop);
+              setTimeout(toTop, 300);
+            }}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button
