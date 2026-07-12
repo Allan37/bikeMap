@@ -6,7 +6,7 @@ import { matchBusiness, searchNearby } from "./poi/yelpClient";
 import { TripPanel } from "./routePanel/TripPanel";
 import { getBestRoutes } from "./routing/candidateSearch";
 import { PlaceSearch } from "./search/PlaceSearch";
-import { SearchBar } from "./search/SearchBar";
+import { SearchSheet } from "./search/SearchSheet";
 import type { Coordinates, POI, RouteOption, YelpBusiness } from "./types";
 
 /** Compact freshness label for the status badge, e.g. "12s", "3m", "1h". */
@@ -153,9 +153,9 @@ function App() {
         onPoiSelect={selectDestination}
         onLocateReady={handleLocateReady}
       />
-      {/* The top search bar steps aside in directions mode so it never collides with the
-          start-location editor or clutters the trip view. */}
-      {!showDirections && <SearchBar onSelect={selectDestination} />}
+      {/* Bottom search sheet appears only when no destination is chosen; once one is, the trip
+          panel takes over the bottom (clear it with × to search again). */}
+      {!destination && <SearchSheet onSelect={selectDestination} />}
       {poiBusiness && !isPoiCardDismissed && !showDirections && (
         <PoiCard business={poiBusiness} onClose={() => setIsPoiCardDismissed(true)} />
       )}

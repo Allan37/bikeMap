@@ -114,6 +114,259 @@ body,
   font-size: 13px;
 }
 
+/* ── Apple-Maps-style bottom search ─────────────────────────────────────────── */
+
+.search-icon {
+  font-size: 15px;
+  opacity: 0.7;
+}
+
+/* Collapsed pill. Sits above the Mapbox logo/attribution (bottom: keeps them visible, per ToS). */
+.search-pill {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(26px + env(safe-area-inset-bottom));
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 240px;
+  max-width: min(92vw, 420px);
+  padding: 15px 20px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  color: #6b6375;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.search-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.search-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  max-height: 62vh;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
+  border-radius: 20px 20px 0 0;
+  background: rgba(250, 248, 244, 0.92);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+}
+
+/* Grows toward full-screen once the user starts typing, for more result context. */
+.search-sheet--full {
+  top: calc(env(safe-area-inset-top) + 8px);
+  max-height: none;
+}
+
+.search-sheet-handle {
+  align-self: center;
+  width: 40px;
+  height: 5px;
+  margin: 2px 0 10px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.search-sheet-inputrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-sheet-input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 16px; /* 16px+ prevents iOS Safari auto-zoom on focus */
+  border: none;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, 0.16);
+  color: #16171d;
+}
+
+.search-sheet-input:focus {
+  outline: 2px solid #2e7d32;
+}
+
+.search-sheet-cancel {
+  flex: none;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: #1976d2;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.search-sheet-body {
+  margin-top: 10px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.search-results {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+}
+
+.search-results li {
+  padding: 12px 8px;
+  border-radius: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+}
+
+.search-results li:last-child {
+  border-bottom: none;
+}
+
+.search-results li:active {
+  background: rgba(46, 125, 50, 0.1);
+}
+
+.search-section-title {
+  margin: 14px 8px 4px;
+  color: #6b6375;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.search-hint {
+  padding: 24px 8px;
+  color: #6b6375;
+  font-size: 14px;
+  text-align: center;
+}
+
+.saved-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.saved-row-main,
+.saved-row-unset {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 8px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.saved-row-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(120, 120, 128, 0.16);
+  font-size: 18px;
+}
+
+.saved-row-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.saved-row-label {
+  color: #16171d;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.saved-row-add {
+  margin-left: auto;
+  color: #1976d2;
+  font-size: 20px;
+}
+
+.saved-row-unset .saved-row-label {
+  color: #1976d2;
+  font-weight: 500;
+}
+
+.saved-row-clear {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.06);
+  color: #6b6375;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .search-pill {
+    background: rgba(40, 40, 44, 0.8);
+    color: #c7c7cc;
+  }
+
+  .search-sheet {
+    background: rgba(28, 28, 30, 0.92);
+  }
+
+  .search-sheet-handle {
+    background: rgba(255, 255, 255, 0.25);
+  }
+
+  .search-sheet-input {
+    background: rgba(120, 120, 128, 0.32);
+    color: #f3f4f6;
+  }
+
+  .search-results li {
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .saved-row-icon {
+    background: rgba(120, 120, 128, 0.32);
+  }
+
+  .saved-row-label {
+    color: #f3f4f6;
+  }
+
+  .saved-row-clear {
+    background: rgba(255, 255, 255, 0.12);
+    color: #c7c7cc;
+  }
+}
+
 /*
  * mapbox-gl.css sets the popup background to white explicitly but never sets an explicit
  * text color, assuming normal inheritance. Our `color-scheme: light dark` above makes

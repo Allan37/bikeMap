@@ -109,7 +109,10 @@ export function MapView({
           layout: {
             "text-field": STATION_LABEL_TEXT_FIELD,
             "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 13],
-            "text-allow-overlap": false,
+            // Always show (like the dead-station ✕): without this the base style's dense labels win
+            // the collision and every station count gets dropped.
+            "text-allow-overlap": true,
+            "text-ignore-placement": true,
           },
           paint: {
             "text-color": "#ffffff",
