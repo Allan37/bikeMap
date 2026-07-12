@@ -7,7 +7,7 @@ html,
 body,
 #root {
   margin: 0;
-  height: 100%;
+  height: 100dvh; /* dynamic viewport height — fills under the iOS home indicator in standalone */
   overflow: hidden;
   /* The map is always the light "day" style (cream land), so paint the page cream too. Without an
      explicit background, iOS falls back to a black backdrop in dark mode and it shows through the
@@ -163,7 +163,7 @@ body,
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: max(8px, calc(env(safe-area-inset-bottom) - 10px));
+  bottom: max(4px, calc(env(safe-area-inset-bottom) - 20px));
   z-index: 4;
   display: flex;
   align-items: center;
@@ -191,6 +191,19 @@ body,
   border: none;
   padding: 0;
   background: rgba(0, 0, 0, 0.12);
+  animation: search-fade-in 0.25s ease;
+}
+
+@keyframes search-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes search-slide-up {
+  from {
+    transform: translateY(100%);
+  }
 }
 
 .search-sheet {
@@ -200,6 +213,7 @@ body,
   bottom: 0;
   z-index: 5;
   max-height: 62vh;
+  animation: search-slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
   flex-direction: column;
   padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
@@ -330,7 +344,24 @@ body,
   height: 38px;
   border-radius: 50%;
   background: rgba(120, 120, 128, 0.16);
-  font-size: 18px;
+  color: #16171d;
+}
+
+/* Recents row: a leading clock icon beside the two-line label. */
+.result-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.result-icon {
+  flex: none;
+  color: #8a8a8f;
+}
+
+/* Inline bike/bolt glyphs in the station popup. */
+.pop-ic {
+  vertical-align: -2px;
 }
 
 .saved-row-text {
@@ -392,6 +423,7 @@ body,
 
   .saved-row-icon {
     background: rgba(120, 120, 128, 0.32);
+    color: #f3f4f6;
   }
 
   .saved-row-label {

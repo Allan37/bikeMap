@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { Briefcase, Clock, House, Plus, X } from "lucide-react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import type { POI } from "../types";
 import { retrievePlace, searchSuggestions, type PlaceSuggestion } from "./mapboxSearch";
 import { addRecent, clearSavedPlace, getSavedPlaces, type SavedKind, setSavedPlace } from "./savedPlaces";
@@ -102,7 +103,8 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
 
   return (
     <>
-      <button type="button" className="search-backdrop" aria-label="Close search" onClick={closeSheet} />
+      {/* Only dim + capture taps in full-screen mode — in the half sheet the map stays interactive. */}
+      {focused && <button type="button" className="search-backdrop" aria-label="Close search" onClick={closeSheet} />}
       <div className={`search-sheet${focused ? " search-sheet--full" : ""}`}>
         <div className="search-sheet-handle" />
         <div className="search-sheet-inputrow">
@@ -158,7 +160,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
           ) : (
             <>
               <SavedRow
-                icon="🏠"
+                icon={<House size={19} strokeWidth={2} />}
                 label="Home"
                 poi={places.home}
                 onGo={chooseSaved}
@@ -169,7 +171,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
                 }}
               />
               <SavedRow
-                icon="💼"
+                icon={<Briefcase size={19} strokeWidth={2} />}
                 label="Work"
                 poi={places.work}
                 onGo={chooseSaved}
@@ -182,9 +184,12 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
               {places.recents.length > 0 && <div className="search-section-title">Recents</div>}
               <ul className="search-results">
                 {places.recents.map((r, i) => (
-                  <li key={`${r.lat},${r.lon},${i}`} onMouseDown={() => chooseSaved(r)}>
-                    <div className="suggestion-name">🕘 {r.name}</div>
-                    <div className="suggestion-subtitle">{r.placeFormatted}</div>
+                  <li key={`${r.lat},${r.lon},${i}`} className="result-row" onMouseDown={() => chooseSaved(r)}>
+                    <Clock size={18} className="result-icon" />
+                    <div>
+                      <div className="suggestion-name">{r.name}</div>
+                      <div className="suggestion-subtitle">{r.placeFormatted}</div>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -197,7 +202,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
 }
 
 interface SavedRowProps {
-  icon: string;
+  icon: ReactNode;
   label: string;
   poi?: POI;
   onGo: (poi: POI) => void;
@@ -211,9 +216,7 @@ function SavedRow({ icon, label, poi, onGo, onSet, onClear }: SavedRowProps) {
       <button type="button" className="saved-row saved-row-unset" onMouseDown={onSet}>
         <span className="saved-row-icon">{icon}</span>
         <span className="saved-row-label">Set {label}</span>
-        <span className="saved-row-add" aria-hidden="true">
-          ＋
-        </span>
+        <Plus size={18} className="saved-row-add" />
       </button>
     );
   }
@@ -227,7 +230,7 @@ function SavedRow({ icon, label, poi, onGo, onSet, onClear }: SavedRowProps) {
         </span>
       </button>
       <button type="button" className="saved-row-clear" onMouseDown={onClear} aria-label={`Clear ${label}`}>
-        ×
+        <X size={16} />
       </button>
     </div>
   );

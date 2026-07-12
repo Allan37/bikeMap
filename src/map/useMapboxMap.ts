@@ -163,8 +163,9 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
         start(); // Android / non-iOS: no permission gate
       }
     };
+    // iOS only reliably shows the permission dialog from a click/touchend, not pointerdown.
     const onFirstGesture = () => enableHeading();
-    window.addEventListener("pointerdown", onFirstGesture, { once: true, capture: true });
+    window.addEventListener("click", onFirstGesture, { once: true, capture: true });
 
     geolocate.on("geolocate", (position: GeolocationPosition) => {
       const { latitude, longitude } = position.coords;
@@ -232,7 +233,7 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
       stopTracking();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("deviceorientation", onOrientation);
-      window.removeEventListener("pointerdown", onFirstGesture, { capture: true });
+      window.removeEventListener("click", onFirstGesture, { capture: true });
       map.remove();
       mapRef.current = null;
       geolocateRef.current = null;

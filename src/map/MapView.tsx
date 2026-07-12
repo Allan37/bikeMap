@@ -18,6 +18,12 @@ import {
 } from "./stationLayer";
 import { useMapboxMap } from "./useMapboxMap";
 
+// Lucide bike / zap glyphs as inline SVG for the (HTML-string) station popup — consistent with the
+// Lucide icons used elsewhere, without pulling react-dom/server into the bundle for two icons.
+const SVG_ATTRS = `class="pop-ic" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+const BIKE_ICON = `<svg ${SVG_ATTRS} stroke="#2e7d32"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`;
+const EBIKE_ICON = `<svg ${SVG_ATTRS} stroke="#f9a825"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>`;
+
 interface MapViewProps {
   stations: Station[];
   destination: POI | null;
@@ -147,7 +153,9 @@ export function MapView({
       };
       const standardBikes = bikesAvailable - ebikesAvailable;
       const bikesLabel =
-        ebikesAvailable > 0 ? `${bikesAvailable} bikes (${standardBikes}⚙️ ${ebikesAvailable}⚡)` : `${bikesAvailable} bikes`;
+        ebikesAvailable > 0
+          ? `${bikesAvailable} bikes (${standardBikes}${BIKE_ICON} ${ebikesAvailable}${EBIKE_ICON})`
+          : `${bikesAvailable} bikes`;
       // No close button — it's a fiddly tap target on mobile; tapping elsewhere (closeOnClick,
       // on by default) dismisses the popup instead.
       new mapboxgl.Popup({ closeButton: false, offset: 10 })
