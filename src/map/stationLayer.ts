@@ -5,17 +5,20 @@ import type { Coordinates, Station } from "../types";
 
 export const STATION_SOURCE_ID = "citibike-stations";
 export const STATION_LAYER_ID = "citibike-stations-layer";
-export const STATION_LABEL_PRIORITY_LAYER_ID = "citibike-station-labels-priority";
-export const STATION_LABEL_NORMAL_LAYER_ID = "citibike-station-labels-normal";
+// Number drawn inside the (enlarged) dot once zoomed in; external number offset above the dot for
+// the few nearest stations when zoomed out; detailed manual/electric/docks breakdown when very close.
+export const STATION_LABEL_INSIDE_LAYER_ID = "citibike-station-labels-inside";
+export const STATION_LABEL_EXTERNAL_LAYER_ID = "citibike-station-labels-external";
 export const STATION_LABEL_DETAIL_LAYER_ID = "citibike-station-labels-detail";
 
-// A station within this distance of your location or destination is close enough to matter, so its
-// count label appears earlier (at a lower zoom) than the rest.
-const NEAR_RADIUS_METERS = 400;
-export const PRIORITY_LABEL_MINZOOM = 13;
-export const NORMAL_LABEL_MINZOOM = 15;
-// Zoomed in this far, the single count breaks out into manual / electric / open docks.
+// From this zoom the dots are big enough to hold a count, so every station shows its number inside.
+export const INSIDE_LABEL_MINZOOM = 14;
+// Zoomed in this far, the count breaks out into manual / electric / open docks.
 export const DETAIL_LABEL_MINZOOM = 17;
+// How many of the closest-to-you stations get an external number when zoomed out past the inside tier.
+const NEAREST_LABEL_COUNT = 3;
+// A station within this distance of the destination shows open docks (parking) rather than bikes.
+const NEAR_DESTINATION_METERS = 400;
 
 export interface StationProperties {
   stationId: string;
@@ -25,9 +28,9 @@ export interface StationProperties {
   docksAvailable: number;
   // Mapbox GL data-driven styling needs a flat scalar to branch on.
   availability: "bikes" | "docks-only" | "dead" | "unknown";
-  // Near your location → grab-a-bike context (show bikes); near your destination → parking context
-  // (show open docks). Both get the earlier, lower-zoom label.
-  nearUser: boolean;
+  // One of the few closest stations to you — gets an external number even when zoomed out.
+  nearestToUser: boolean;
+  // Near the destination → show open docks (where you park) instead of bikes.
   nearDestination: boolean;
 }
 
@@ -45,31 +48,41 @@ export function stationsToGeoJSON(
   userLocation?: Coordinates | null,
   destination?: Coordinates | null,
 ): FeatureCollection<Point, StationProperties> {
-  const features: Feature<Point, StationProperties>[] = stations.map((s) => {
-    const here: Coordinates = { lat: s.lat, lon: s.lon };
-    return {
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [s.lon, s.lat] },
-      properties: {
-        stationId: s.stationId,
-        name: s.name,
-        bikesAvailable: s.status?.bikesAvailable ?? 0,
-        ebikesAvailable: s.status?.ebikesAvailable ?? 0,
-        docksAvailable: s.status?.docksAvailable ?? 0,
-        availability: availabilityFor(s),
-        nearUser: userLocation ? haversineDistanceMeters(userLocation, here) <= NEAR_RADIUS_METERS : false,
-        nearDestination: destination ? haversineDistanceMeters(destination, here) <= NEAR_RADIUS_METERS : false,
-      },
-    };
-  });
+  // The N stations physically closest to you — labeled externally when zoomed out.
+  const nearestIds = new Set<string>(
+    userLocation
+      ? stations
+          .map((s) => ({ id: s.stationId, d: haversineDistanceMeters(userLocation, { lat: s.lat, lon: s.lon }) }))
+          .sort((a, b) => a.d - b.d)
+          .slice(0, NEAREST_LABEL_COUNT)
+          .map((x) => x.id)
+      : [],
+  );
+
+  const features: Feature<Point, StationProperties>[] = stations.map((s) => ({
+    type: "Feature",
+    geometry: { type: "Point", coordinates: [s.lon, s.lat] },
+    properties: {
+      stationId: s.stationId,
+      name: s.name,
+      bikesAvailable: s.status?.bikesAvailable ?? 0,
+      ebikesAvailable: s.status?.ebikesAvailable ?? 0,
+      docksAvailable: s.status?.docksAvailable ?? 0,
+      availability: availabilityFor(s),
+      nearestToUser: nearestIds.has(s.stationId),
+      nearDestination: destination
+        ? haversineDistanceMeters(destination, { lat: s.lat, lon: s.lon }) <= NEAR_DESTINATION_METERS
+        : false,
+    },
+  }));
   return { type: "FeatureCollection", features };
 }
 
-/** Label text: open docks ("12 P") near the destination — where you park — else the bike count. */
+/** Label text: open docks ("12P") near the destination — where you park — else the bike count. */
 export const STATION_LABEL_TEXT_FIELD: ExpressionSpecification = [
   "case",
   ["get", "nearDestination"],
-  ["concat", ["to-string", ["get", "docksAvailable"]], " P"],
+  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
   ["to-string", ["get", "bikesAvailable"]],
 ];
 
@@ -86,10 +99,26 @@ export const STATION_LABEL_DETAIL_TEXT_FIELD: ExpressionSpecification = [
 
 // Only label stations with real data (dead stations already carry a ✕; skip unknown/no-data).
 const HAS_DATA: FilterSpecification = ["match", ["get", "availability"], ["bikes", "docks-only"], true, false];
-const IS_NEAR: FilterSpecification = ["any", ["get", "nearUser"], ["get", "nearDestination"]];
-export const STATION_LABEL_PRIORITY_FILTER: FilterSpecification = ["all", HAS_DATA, IS_NEAR];
-export const STATION_LABEL_NORMAL_FILTER: FilterSpecification = ["all", HAS_DATA, ["!", IS_NEAR]];
+export const STATION_LABEL_INSIDE_FILTER: FilterSpecification = HAS_DATA;
 export const STATION_LABEL_DETAIL_FILTER: FilterSpecification = HAS_DATA;
+export const STATION_LABEL_EXTERNAL_FILTER: FilterSpecification = [
+  "all",
+  HAS_DATA,
+  ["any", ["get", "nearestToUser"], ["get", "nearDestination"]],
+];
+
+/** Dot radius — enlarged (roughly 2× the old sizes) so a count fits inside once zoomed in. */
+export const STATION_CIRCLE_RADIUS: DataDrivenPropertyValueSpecification<number> = [
+  "interpolate",
+  ["linear"],
+  ["zoom"],
+  11,
+  4,
+  14,
+  11,
+  17,
+  17,
+];
 
 /** Color stations green (has bikes), amber (docks only, no bikes), near-black (dead: 0 bikes & 0 docks), gray (no data yet). */
 export const STATION_CIRCLE_COLOR: DataDrivenPropertyValueSpecification<string> = [

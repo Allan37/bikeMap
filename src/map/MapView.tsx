@@ -5,16 +5,16 @@ import type { Coordinates, POI, RouteOption, Station } from "../types";
 import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
 import {
   DETAIL_LABEL_MINZOOM,
-  NORMAL_LABEL_MINZOOM,
-  PRIORITY_LABEL_MINZOOM,
+  INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
+  STATION_CIRCLE_RADIUS,
   STATION_LABEL_DETAIL_FILTER,
   STATION_LABEL_DETAIL_LAYER_ID,
   STATION_LABEL_DETAIL_TEXT_FIELD,
-  STATION_LABEL_NORMAL_FILTER,
-  STATION_LABEL_NORMAL_LAYER_ID,
-  STATION_LABEL_PRIORITY_FILTER,
-  STATION_LABEL_PRIORITY_LAYER_ID,
+  STATION_LABEL_EXTERNAL_FILTER,
+  STATION_LABEL_EXTERNAL_LAYER_ID,
+  STATION_LABEL_INSIDE_FILTER,
+  STATION_LABEL_INSIDE_LAYER_ID,
   STATION_LABEL_TEXT_FIELD,
   STATION_LAYER_ID,
   STATION_SOURCE_ID,
@@ -78,9 +78,9 @@ export function MapView({
       type: "circle",
       source: STATION_SOURCE_ID,
       paint: {
-        "circle-radius": ["interpolate", ["linear"], ["zoom"], 11, 3, 16, 8],
+        "circle-radius": STATION_CIRCLE_RADIUS,
         "circle-color": STATION_CIRCLE_COLOR,
-        "circle-stroke-width": 1,
+        "circle-stroke-width": 1.5,
         "circle-stroke-color": "#ffffff",
       },
     });
@@ -102,37 +102,56 @@ export function MapView({
       },
     });
 
-    // Count labels at three zoom tiers: near stations get a single count early (13), all stations
-    // by 15, and from 17 the count breaks out into manual/electric/open-docks. Wrapped defensively —
-    // these are enrichment and must never take down the core map/route layers.
+    // Count labels in three tiers (all always-shown so the base style's dense labels can't drop
+    // them). Wrapped defensively — enrichment must never take down the core map/route layers.
+    // - external: only the nearest few stations, number floated ABOVE the dot, when zoomed out.
+    // - inside: every station, number centered INSIDE the enlarged dot, once zoomed in (14+).
+    // - detail: manual/electric/docks broken out BELOW the dot, when very close (17+).
     try {
-      for (const [id, filter, minzoom, maxzoom, textField] of [
-        [STATION_LABEL_PRIORITY_LAYER_ID, STATION_LABEL_PRIORITY_FILTER, PRIORITY_LABEL_MINZOOM, DETAIL_LABEL_MINZOOM, STATION_LABEL_TEXT_FIELD] as const,
-        [STATION_LABEL_NORMAL_LAYER_ID, STATION_LABEL_NORMAL_FILTER, NORMAL_LABEL_MINZOOM, DETAIL_LABEL_MINZOOM, STATION_LABEL_TEXT_FIELD] as const,
-        [STATION_LABEL_DETAIL_LAYER_ID, STATION_LABEL_DETAIL_FILTER, DETAIL_LABEL_MINZOOM, 24, STATION_LABEL_DETAIL_TEXT_FIELD] as const,
-      ]) {
-        map.addLayer({
-          id,
-          type: "symbol",
-          source: STATION_SOURCE_ID,
-          minzoom,
-          maxzoom,
-          filter,
-          layout: {
-            "text-field": textField,
-            "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 12],
-            // Always show (like the dead-station ✕): without this the base style's dense labels win
-            // the collision and every station count gets dropped.
-            "text-allow-overlap": true,
-            "text-ignore-placement": true,
-          },
-          paint: {
-            "text-color": "#ffffff",
-            "text-halo-color": "rgba(0, 0, 0, 0.65)",
-            "text-halo-width": 1.4,
-          },
-        });
-      }
+      const alwaysShow = { "text-allow-overlap": true, "text-ignore-placement": true } as const;
+      map.addLayer({
+        id: STATION_LABEL_EXTERNAL_LAYER_ID,
+        type: "symbol",
+        source: STATION_SOURCE_ID,
+        maxzoom: INSIDE_LABEL_MINZOOM,
+        filter: STATION_LABEL_EXTERNAL_FILTER,
+        layout: {
+          "text-field": STATION_LABEL_TEXT_FIELD,
+          "text-size": 12,
+          "text-anchor": "bottom",
+          "text-offset": [0, -0.6],
+          ...alwaysShow,
+        },
+        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.7)", "text-halo-width": 1.6 },
+      });
+      map.addLayer({
+        id: STATION_LABEL_INSIDE_LAYER_ID,
+        type: "symbol",
+        source: STATION_SOURCE_ID,
+        minzoom: INSIDE_LABEL_MINZOOM,
+        filter: STATION_LABEL_INSIDE_FILTER,
+        layout: {
+          "text-field": STATION_LABEL_TEXT_FIELD,
+          "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 17, 15],
+          ...alwaysShow,
+        },
+        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.25)", "text-halo-width": 0.8 },
+      });
+      map.addLayer({
+        id: STATION_LABEL_DETAIL_LAYER_ID,
+        type: "symbol",
+        source: STATION_SOURCE_ID,
+        minzoom: DETAIL_LABEL_MINZOOM,
+        filter: STATION_LABEL_DETAIL_FILTER,
+        layout: {
+          "text-field": STATION_LABEL_DETAIL_TEXT_FIELD,
+          "text-size": 11,
+          "text-anchor": "top",
+          "text-offset": [0, 1.4],
+          ...alwaysShow,
+        },
+        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.7)", "text-halo-width": 1.6 },
+      });
     } catch (err) {
       console.warn("[bikeMap] station count labels failed to initialize", err);
     }
@@ -162,9 +181,9 @@ export function MapView({
         ebikesAvailable > 0
           ? `${bikesAvailable} bikes (${standardBikes}${BIKE_ICON} ${ebikesAvailable}${EBIKE_ICON})`
           : `${bikesAvailable} bikes`;
-      // No close button — it's a fiddly tap target on mobile; tapping elsewhere (closeOnClick,
-      // on by default) dismisses the popup instead.
-      new mapboxgl.Popup({ closeButton: false, offset: 10 })
+      // No close button — fiddly on mobile. closeOnMove dismisses it as soon as you pan/zoom even
+      // slightly; closeOnClick (default) dismisses on a tap elsewhere.
+      new mapboxgl.Popup({ closeButton: false, offset: 10, closeOnMove: true })
         .setLngLat(feature.geometry.coordinates as [number, number])
         .setHTML(`<strong>${name}</strong><br/>${bikesLabel} · ${docksAvailable} docks`)
         .addTo(map);
