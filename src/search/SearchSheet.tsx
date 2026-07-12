@@ -10,12 +10,13 @@ interface SearchSheetProps {
 const DEBOUNCE_MS = 250;
 
 /**
- * Apple-Maps-style search: a rounded pill at the bottom that expands into a sheet with saved
- * places (Home/Work) + recents, then grows toward full-screen as you type. Saved places live in
- * localStorage (see savedPlaces.ts) — nothing personal is committed or shipped in the bundle.
+ * Apple-Maps-style search. Tapping the bottom pill expands a medium sheet with saved places
+ * (Home/Work) + recents WITHOUT raising the keyboard; tapping the field then goes full-screen and
+ * focuses (this two-stage flow avoids iOS scroll-jump on focus). Saved places live in localStorage.
  */
 export function SearchSheet({ onSelect }: SearchSheetProps) {
   const [open, setOpen] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   // When set, a picked result is saved as Home/Work instead of navigating there.
@@ -44,18 +45,13 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
     return () => clearTimeout(id);
   }, [query]);
 
-  function openSheet() {
-    setOpen(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }
   function closeSheet() {
+    inputRef.current?.blur();
     setOpen(false);
+    setFocused(false);
     setQuery("");
     setSuggestions([]);
     setAssignKind(null);
-  }
-  function focusInputSoon() {
-    setTimeout(() => inputRef.current?.focus(), 50);
   }
 
   async function pick(suggestion: PlaceSuggestion) {
@@ -89,15 +85,13 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
     setAssignKind(kind);
     setQuery("");
     setSuggestions([]);
-    focusInputSoon();
+    setFocused(true);
+    setTimeout(() => inputRef.current?.focus(), 50);
   }
 
   if (!open) {
     return (
-      <button type="button" className="search-pill" onClick={openSheet}>
-        <span className="search-icon" aria-hidden="true">
-          🔍
-        </span>
+      <button type="button" className="search-pill" onClick={() => setOpen(true)}>
         Search Maps
       </button>
     );
@@ -109,18 +103,21 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   return (
     <>
       <button type="button" className="search-backdrop" aria-label="Close search" onClick={closeSheet} />
-      <div className={`search-sheet${showResults ? " search-sheet--full" : ""}`}>
+      <div className={`search-sheet${focused ? " search-sheet--full" : ""}`}>
         <div className="search-sheet-handle" />
         <div className="search-sheet-inputrow">
-          <span className="search-icon" aria-hidden="true">
-            🔍
-          </span>
           <input
             ref={inputRef}
             className="search-sheet-input"
-            type="text"
+            type="search"
             value={query}
             placeholder={placeholder}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            enterKeyHint="search"
+            onFocus={() => setFocused(true)}
             onChange={(e) => setQuery(e.target.value)}
           />
           <button

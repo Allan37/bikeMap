@@ -38,7 +38,13 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     });
     // No on-screen zoom/compass buttons — pinch-to-zoom and two-finger rotate (both on by
     // default) cover this on mobile without extra UI chrome.
-    map.on("load", () => setIsLoaded(true));
+    map.on("load", () => {
+      setIsLoaded(true);
+      // Standalone iOS PWAs launch with no resize event, so the canvas can be measured before the
+      // safe-area layout settles — leaving a strip of page background at the bottom. Re-measure.
+      map.resize();
+      setTimeout(() => map.resize(), 300);
+    });
     mapRef.current = map;
     if (import.meta.env.DEV) (window as any).__debugMap = map; // dev-only inspection hook
 
@@ -75,6 +81,9 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     const ROUTING_MIN_INTERVAL_MS = 30000;
     const dotElement = document.createElement("div");
     dotElement.className = "user-dot";
+    const coneElement = document.createElement("div");
+    coneElement.className = "user-dot-cone";
+    dotElement.appendChild(coneElement);
     const dotMarker = new mapboxgl.Marker({ element: dotElement });
     let dotAdded = false;
     let lastRoutingPush = 0;
@@ -124,6 +133,38 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     // resume it on return.
     const onVisibilityChange = () => (document.hidden ? stopTracking() : startTracking());
     document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // --- Compass heading (which way you're facing) ------------------------------------------
+    // iOS gates DeviceOrientation behind a permission that must be requested from a user gesture,
+    // so we lazily request it on the first tap anywhere, then rotate a wedge on the dot to heading.
+    let headingEnabled = false;
+    const onOrientation = (e: DeviceOrientationEvent) => {
+      const compass = (e as DeviceOrientationEvent & { webkitCompassHeading?: number }).webkitCompassHeading;
+      const heading = typeof compass === "number" ? compass : typeof e.alpha === "number" ? 360 - e.alpha : null;
+      if (heading == null) return;
+      dotElement.classList.add("user-dot--has-heading");
+      // Subtract the map's bearing so the wedge stays correct even if the map is rotated.
+      coneElement.style.transform = `rotate(${heading - map.getBearing()}deg)`;
+    };
+    const enableHeading = () => {
+      if (headingEnabled) return;
+      headingEnabled = true;
+      const DOE = window.DeviceOrientationEvent as
+        | (typeof DeviceOrientationEvent & { requestPermission?: () => Promise<"granted" | "denied"> })
+        | undefined;
+      const start = () => window.addEventListener("deviceorientation", onOrientation);
+      if (DOE && typeof DOE.requestPermission === "function") {
+        DOE.requestPermission()
+          .then((res) => {
+            if (res === "granted") start();
+          })
+          .catch(() => {});
+      } else {
+        start(); // Android / non-iOS: no permission gate
+      }
+    };
+    const onFirstGesture = () => enableHeading();
+    window.addEventListener("pointerdown", onFirstGesture, { once: true, capture: true });
 
     geolocate.on("geolocate", (position: GeolocationPosition) => {
       const { latitude, longitude } = position.coords;
@@ -190,6 +231,8 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     return () => {
       stopTracking();
       document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("deviceorientation", onOrientation);
+      window.removeEventListener("pointerdown", onFirstGesture, { capture: true });
       map.remove();
       mapRef.current = null;
       geolocateRef.current = null;

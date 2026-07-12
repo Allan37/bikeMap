@@ -17,7 +17,8 @@ body,
 
 .status-badge {
   position: absolute;
-  bottom: calc(12px + env(safe-area-inset-bottom));
+  /* Sits low, but above the Mapbox logo (which must stay visible per ToS). */
+  bottom: max(6px, calc(env(safe-area-inset-bottom) - 8px));
   left: 12px;
   z-index: 1;
   padding: 6px 12px;
@@ -30,6 +31,7 @@ body,
 
 /* Our own live-location dot (mapbox's built-in one is disabled via showUserLocation:false). */
 .user-dot {
+  position: relative;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -38,6 +40,27 @@ body,
   box-shadow:
     0 0 0 2px rgba(26, 115, 232, 0.35),
     0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Heading wedge — a triangle anchored at the dot centre, rotated toward the compass heading.
+   Hidden until the first orientation reading arrives (see useMapboxMap). */
+.user-dot-cone {
+  position: absolute;
+  left: 50%;
+  bottom: 50%;
+  margin-left: -9px;
+  width: 0;
+  height: 0;
+  border-left: 9px solid transparent;
+  border-right: 9px solid transparent;
+  border-bottom: 22px solid rgba(26, 115, 232, 0.5);
+  transform-origin: 50% 100%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.user-dot--has-heading .user-dot-cone {
+  opacity: 1;
 }
 
 /* Sits below the search bar and away from the bottom-right locate button it describes. */
@@ -123,7 +146,7 @@ body,
 
 /* Collapsed pill. Sits above the Mapbox logo/attribution (bottom: keeps them visible, per ToS). */
 .search-pill {
-  position: absolute;
+  position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(26px + env(safe-area-inset-bottom));
@@ -132,8 +155,8 @@ body,
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-width: 240px;
-  max-width: min(92vw, 420px);
+  min-width: 150px;
+  max-width: min(64vw, 260px);
   padding: 15px 20px;
   border: none;
   border-radius: 999px;
@@ -148,7 +171,7 @@ body,
 }
 
 .search-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
   z-index: 4;
   border: none;
@@ -157,7 +180,7 @@ body,
 }
 
 .search-sheet {
-  position: absolute;
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
