@@ -7,12 +7,15 @@ export const STATION_SOURCE_ID = "citibike-stations";
 export const STATION_LAYER_ID = "citibike-stations-layer";
 export const STATION_LABEL_PRIORITY_LAYER_ID = "citibike-station-labels-priority";
 export const STATION_LABEL_NORMAL_LAYER_ID = "citibike-station-labels-normal";
+export const STATION_LABEL_DETAIL_LAYER_ID = "citibike-station-labels-detail";
 
 // A station within this distance of your location or destination is close enough to matter, so its
 // count label appears earlier (at a lower zoom) than the rest.
 const NEAR_RADIUS_METERS = 400;
 export const PRIORITY_LABEL_MINZOOM = 13;
 export const NORMAL_LABEL_MINZOOM = 15;
+// Zoomed in this far, the single count breaks out into manual / electric / open docks.
+export const DETAIL_LABEL_MINZOOM = 17;
 
 export interface StationProperties {
   stationId: string;
@@ -70,11 +73,23 @@ export const STATION_LABEL_TEXT_FIELD: ExpressionSpecification = [
   ["to-string", ["get", "bikesAvailable"]],
 ];
 
+/** Detailed breakdown, e.g. "3m 2e 8p" — manual bikes, e-bikes, open docks (parking). */
+export const STATION_LABEL_DETAIL_TEXT_FIELD: ExpressionSpecification = [
+  "concat",
+  ["to-string", ["-", ["get", "bikesAvailable"], ["get", "ebikesAvailable"]]],
+  "m  ",
+  ["to-string", ["get", "ebikesAvailable"]],
+  "e  ",
+  ["to-string", ["get", "docksAvailable"]],
+  "p",
+];
+
 // Only label stations with real data (dead stations already carry a ✕; skip unknown/no-data).
 const HAS_DATA: FilterSpecification = ["match", ["get", "availability"], ["bikes", "docks-only"], true, false];
 const IS_NEAR: FilterSpecification = ["any", ["get", "nearUser"], ["get", "nearDestination"]];
 export const STATION_LABEL_PRIORITY_FILTER: FilterSpecification = ["all", HAS_DATA, IS_NEAR];
 export const STATION_LABEL_NORMAL_FILTER: FilterSpecification = ["all", HAS_DATA, ["!", IS_NEAR]];
+export const STATION_LABEL_DETAIL_FILTER: FilterSpecification = HAS_DATA;
 
 /** Color stations green (has bikes), amber (docks only, no bikes), near-black (dead: 0 bikes & 0 docks), gray (no data yet). */
 export const STATION_CIRCLE_COLOR: DataDrivenPropertyValueSpecification<string> = [

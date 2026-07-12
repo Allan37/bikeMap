@@ -4,9 +4,13 @@ import { useEffect, useRef } from "react";
 import type { Coordinates, POI, RouteOption, Station } from "../types";
 import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
 import {
+  DETAIL_LABEL_MINZOOM,
   NORMAL_LABEL_MINZOOM,
   PRIORITY_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
+  STATION_LABEL_DETAIL_FILTER,
+  STATION_LABEL_DETAIL_LAYER_ID,
+  STATION_LABEL_DETAIL_TEXT_FIELD,
   STATION_LABEL_NORMAL_FILTER,
   STATION_LABEL_NORMAL_LAYER_ID,
   STATION_LABEL_PRIORITY_FILTER,
@@ -98,23 +102,25 @@ export function MapView({
       },
     });
 
-    // Count labels: bikes normally, open docks ("12 P") near the destination. Two layers so the
-    // stations near you or your destination surface their label at a lower zoom than the rest.
-    // Wrapped defensively: these are enrichment, and must never take down the core map/route layers.
+    // Count labels at three zoom tiers: near stations get a single count early (13), all stations
+    // by 15, and from 17 the count breaks out into manual/electric/open-docks. Wrapped defensively —
+    // these are enrichment and must never take down the core map/route layers.
     try {
-      for (const [id, filter, minzoom] of [
-        [STATION_LABEL_NORMAL_LAYER_ID, STATION_LABEL_NORMAL_FILTER, NORMAL_LABEL_MINZOOM] as const,
-        [STATION_LABEL_PRIORITY_LAYER_ID, STATION_LABEL_PRIORITY_FILTER, PRIORITY_LABEL_MINZOOM] as const,
+      for (const [id, filter, minzoom, maxzoom, textField] of [
+        [STATION_LABEL_PRIORITY_LAYER_ID, STATION_LABEL_PRIORITY_FILTER, PRIORITY_LABEL_MINZOOM, DETAIL_LABEL_MINZOOM, STATION_LABEL_TEXT_FIELD] as const,
+        [STATION_LABEL_NORMAL_LAYER_ID, STATION_LABEL_NORMAL_FILTER, NORMAL_LABEL_MINZOOM, DETAIL_LABEL_MINZOOM, STATION_LABEL_TEXT_FIELD] as const,
+        [STATION_LABEL_DETAIL_LAYER_ID, STATION_LABEL_DETAIL_FILTER, DETAIL_LABEL_MINZOOM, 24, STATION_LABEL_DETAIL_TEXT_FIELD] as const,
       ]) {
         map.addLayer({
           id,
           type: "symbol",
           source: STATION_SOURCE_ID,
           minzoom,
+          maxzoom,
           filter,
           layout: {
-            "text-field": STATION_LABEL_TEXT_FIELD,
-            "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 13],
+            "text-field": textField,
+            "text-size": ["interpolate", ["linear"], ["zoom"], 13, 10, 17, 12],
             // Always show (like the dead-station ✕): without this the base style's dense labels win
             // the collision and every station count gets dropped.
             "text-allow-overlap": true,
@@ -252,7 +258,9 @@ export function MapView({
       feature.geometry.coordinates.forEach((coord) => bounds.extend(coord as [number, number]));
     });
     if (!bounds.isEmpty()) {
-      map.fitBounds(bounds, { padding: 60 });
+      // Keep the user's current rotation instead of snapping back to north — Manhattan's grid reads
+      // better tilted, and a sudden re-orient is jarring.
+      map.fitBounds(bounds, { padding: 60, bearing: map.getBearing() });
     }
   }, [selectedRoute, isLoaded, mapRef]);
 

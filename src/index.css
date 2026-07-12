@@ -43,32 +43,50 @@ body,
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-/* Our own live-location dot (mapbox's built-in one is disabled via showUserLocation:false). */
+/* Our own live-location dot (mapbox's built-in one is disabled via showUserLocation:false).
+   .user-dot is the mapbox-positioned wrapper; the core/cone are children so their animations
+   don't clobber the marker's positioning transform. */
 .user-dot {
   position: relative;
   width: 18px;
   height: 18px;
+}
+
+/* Blue center, gently pulsing like Apple's locator dot. */
+.user-dot-core {
+  position: absolute;
+  inset: 0;
   border-radius: 50%;
   background: #1a73e8;
   border: 3px solid #ffffff;
   box-shadow:
     0 0 0 2px rgba(26, 115, 232, 0.35),
     0 1px 4px rgba(0, 0, 0, 0.4);
+  animation: user-dot-pulse 2.4s ease-in-out infinite;
 }
 
-/* Heading wedge — a triangle anchored at the dot centre, rotated toward the compass heading.
-   Hidden until the first orientation reading arrives (see useMapboxMap). */
+@keyframes user-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.82);
+  }
+}
+
+/* Heading beam — a cone that widens away from the dot with a fading gradient, rotated toward the
+   compass heading. Hidden until the first orientation reading arrives (see useMapboxMap). */
 .user-dot-cone {
   position: absolute;
   left: 50%;
   bottom: 50%;
-  margin-left: -9px;
-  width: 0;
-  height: 0;
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
-  border-bottom: 22px solid rgba(26, 115, 232, 0.5);
+  width: 46px;
+  height: 32px;
+  margin-left: -23px;
   transform-origin: 50% 100%;
+  clip-path: polygon(50% 100%, 0 8%, 20% 0, 80% 0, 100% 8%);
+  background: linear-gradient(to top, rgba(26, 115, 232, 0.6), rgba(26, 115, 232, 0));
   opacity: 0;
   pointer-events: none;
 }

@@ -79,11 +79,15 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     // so route options don't churn as you walk. Tracking pauses whenever Safari is backgrounded.
     const DOT_INTERVAL_MS = 5000;
     const ROUTING_MIN_INTERVAL_MS = 30000;
+    // .user-dot is the marker element mapbox positions (don't animate its transform); the cone and
+    // the pulsing blue core are children so their own transforms/animations don't fight positioning.
     const dotElement = document.createElement("div");
     dotElement.className = "user-dot";
     const coneElement = document.createElement("div");
     coneElement.className = "user-dot-cone";
-    dotElement.appendChild(coneElement);
+    const coreElement = document.createElement("div");
+    coreElement.className = "user-dot-core";
+    dotElement.append(coneElement, coreElement);
     const dotMarker = new mapboxgl.Marker({ element: dotElement });
     let dotAdded = false;
     let lastRoutingPush = 0;
@@ -163,9 +167,11 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
         start(); // Android / non-iOS: no permission gate
       }
     };
-    // iOS only reliably shows the permission dialog from a click/touchend, not pointerdown.
+    // iOS only shows the permission dialog from an activation gesture. Listen on both a tap (click)
+    // and touchend so panning/pinch-zooming the map also triggers it, not only tapping a control.
     const onFirstGesture = () => enableHeading();
     window.addEventListener("click", onFirstGesture, { once: true, capture: true });
+    window.addEventListener("touchend", onFirstGesture, { once: true, capture: true });
 
     geolocate.on("geolocate", (position: GeolocationPosition) => {
       const { latitude, longitude } = position.coords;
@@ -234,6 +240,7 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("deviceorientation", onOrientation);
       window.removeEventListener("click", onFirstGesture, { capture: true });
+      window.removeEventListener("touchend", onFirstGesture, { capture: true });
       map.remove();
       mapRef.current = null;
       geolocateRef.current = null;

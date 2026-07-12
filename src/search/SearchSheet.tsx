@@ -26,6 +26,8 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   const sessionTokenRef = useRef(crypto.randomUUID());
   const skipNextSearchRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const pillStartYRef = useRef<number | null>(null);
+  const swipeHandledRef = useRef(false);
 
   useEffect(() => {
     if (skipNextSearchRef.current) {
@@ -91,8 +93,34 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   }
 
   if (!open) {
+    // Swipe up on the pill → half sheet (saved places, no keyboard). Tap → full-screen search.
     return (
-      <button type="button" className="search-pill" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="search-pill"
+        onPointerDown={(e) => {
+          pillStartYRef.current = e.clientY;
+        }}
+        onPointerUp={(e) => {
+          const start = pillStartYRef.current;
+          pillStartYRef.current = null;
+          if (start != null && start - e.clientY > 24) {
+            // A swipe up → half sheet (saved places, no keyboard); suppress the click that follows.
+            swipeHandledRef.current = true;
+            setOpen(true);
+          }
+        }}
+        onClick={() => {
+          if (swipeHandledRef.current) {
+            swipeHandledRef.current = false;
+            return;
+          }
+          // A tap → full-screen search.
+          setOpen(true);
+          setFocused(true);
+          setTimeout(() => inputRef.current?.focus(), 60);
+        }}
+      >
         Search Maps
       </button>
     );

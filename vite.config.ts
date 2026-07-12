@@ -16,8 +16,15 @@ function buildId(): string {
         return 'dev'
       }
     })()
-  const time = new Date().toISOString().slice(5, 16).replace('T', ' ') // MM-DD HH:MM (UTC)
-  return `${sha} · ${time}`
+  const time = new Date().toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }) // MM/DD, HH:MM (Eastern)
+  return `${sha} · ${time} ET`
 }
 
 // Mounts the same Yelp proxy logic as api/yelp-search.ts (the real Vercel function) so
