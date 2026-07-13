@@ -85,8 +85,11 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     dotElement.className = "user-dot";
     const coneElement = document.createElement("div");
     coneElement.className = "user-dot-cone";
-    const coreElement = document.createElement("div");
+    const coreElement = document.createElement("div"); // fixed white ring
     coreElement.className = "user-dot-core";
+    const centerElement = document.createElement("div"); // pulsing blue center
+    centerElement.className = "user-dot-center";
+    coreElement.appendChild(centerElement);
     dotElement.append(coneElement, coreElement);
     const dotMarker = new mapboxgl.Marker({ element: dotElement });
     let dotAdded = false;

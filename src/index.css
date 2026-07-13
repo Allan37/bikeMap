@@ -52,16 +52,22 @@ body,
   height: 18px;
 }
 
-/* Blue center, gently pulsing like Apple's locator dot. */
+/* Fixed white ring; the blue center inside it pulses (like Apple's locator dot). */
 .user-dot-core {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: #1a73e8;
-  border: 3px solid #ffffff;
+  background: #ffffff;
   box-shadow:
     0 0 0 2px rgba(26, 115, 232, 0.35),
     0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+.user-dot-center {
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #1a73e8;
   animation: user-dot-pulse 2.4s ease-in-out infinite;
 }
 
@@ -71,7 +77,7 @@ body,
     transform: scale(1);
   }
   50% {
-    transform: scale(0.82);
+    transform: scale(0.78);
   }
 }
 

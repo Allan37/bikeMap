@@ -86,6 +86,17 @@ export const STATION_LABEL_TEXT_FIELD: ExpressionSpecification = [
   ["to-string", ["get", "bikesAvailable"]],
 ];
 
+/** Inside-the-dot text: a ✕ for dead stations, otherwise the count. Keeps the dead marker in the
+    same layer as the counts (not floating above every other dot). */
+export const STATION_LABEL_INSIDE_TEXT_FIELD: ExpressionSpecification = [
+  "case",
+  ["==", ["get", "availability"], "dead"],
+  "✕",
+  ["get", "nearDestination"],
+  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
+  ["to-string", ["get", "bikesAvailable"]],
+];
+
 /** Detailed breakdown, e.g. "3m 2e 8p" — manual bikes, e-bikes, open docks (parking). */
 export const STATION_LABEL_DETAIL_TEXT_FIELD: ExpressionSpecification = [
   "concat",
@@ -97,9 +108,16 @@ export const STATION_LABEL_DETAIL_TEXT_FIELD: ExpressionSpecification = [
   "p",
 ];
 
-// Only label stations with real data (dead stations already carry a ✕; skip unknown/no-data).
+// External/detail labels only for stations with a live count; skip unknown/no-data.
 const HAS_DATA: FilterSpecification = ["match", ["get", "availability"], ["bikes", "docks-only"], true, false];
-export const STATION_LABEL_INSIDE_FILTER: FilterSpecification = HAS_DATA;
+// The inside layer also carries the dead ✕, so it includes dead (just not unknown/no-data).
+export const STATION_LABEL_INSIDE_FILTER: FilterSpecification = [
+  "match",
+  ["get", "availability"],
+  ["bikes", "docks-only", "dead"],
+  true,
+  false,
+];
 export const STATION_LABEL_DETAIL_FILTER: FilterSpecification = HAS_DATA;
 export const STATION_LABEL_EXTERNAL_FILTER: FilterSpecification = [
   "all",

@@ -15,6 +15,7 @@ import {
   STATION_LABEL_EXTERNAL_LAYER_ID,
   STATION_LABEL_INSIDE_FILTER,
   STATION_LABEL_INSIDE_LAYER_ID,
+  STATION_LABEL_INSIDE_TEXT_FIELD,
   STATION_LABEL_TEXT_FIELD,
   STATION_LAYER_ID,
   STATION_SOURCE_ID,
@@ -84,24 +85,6 @@ export function MapView({
         "circle-stroke-color": "#ffffff",
       },
     });
-    // Overlay a white "x" on dead stations (0 bikes and 0 docks) — a redundant signal on
-    // top of color alone, so it's not just "which shade of dark is this" at a glance.
-    map.addLayer({
-      id: `${STATION_LAYER_ID}-dead-marker`,
-      type: "symbol",
-      source: STATION_SOURCE_ID,
-      filter: ["==", ["get", "availability"], "dead"],
-      layout: {
-        "text-field": "✕",
-        "text-size": ["interpolate", ["linear"], ["zoom"], 11, 6, 16, 12],
-        "text-allow-overlap": true,
-        "text-ignore-placement": true,
-      },
-      paint: {
-        "text-color": "#ffffff",
-      },
-    });
-
     // Count labels in three tiers (all always-shown so the base style's dense labels can't drop
     // them). Wrapped defensively — enrichment must never take down the core map/route layers.
     // - external: only the nearest few stations, number floated ABOVE the dot, when zoomed out.
@@ -131,7 +114,7 @@ export function MapView({
         minzoom: INSIDE_LABEL_MINZOOM,
         filter: STATION_LABEL_INSIDE_FILTER,
         layout: {
-          "text-field": STATION_LABEL_TEXT_FIELD,
+          "text-field": STATION_LABEL_INSIDE_TEXT_FIELD,
           "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 17, 15],
           ...alwaysShow,
         },

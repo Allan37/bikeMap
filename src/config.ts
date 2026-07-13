@@ -25,7 +25,9 @@ export const STATION_STATUS_POLL_INTERVAL_ACTIVE_MS = 15_000;
 
 /** Default map center — NYC, roughly Manhattan. Overridden by geolocation once available. */
 export const DEFAULT_MAP_CENTER: [number, number] = [-73.98, 40.75];
-export const DEFAULT_MAP_ZOOM = 13;
+// A touch past the zoom where dots show their count inside (INSIDE_LABEL_MINZOOM), so on load —
+// centered on you once located — stations already read their bike counts.
+export const DEFAULT_MAP_ZOOM = 15;
 
 /**
  * Mapbox's "Standard" base style exposes color/density config knobs (unlike streets-v12,
