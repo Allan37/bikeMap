@@ -3,6 +3,8 @@ import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, Fil
 import { haversineDistanceMeters } from "../routing/scoring";
 import type { Coordinates, Station } from "../types";
 
+export type StationMode = "bike" | "park";
+
 export const STATION_SOURCE_ID = "citibike-stations";
 export const STATION_LAYER_ID = "citibike-stations-layer";
 // Number drawn inside the (enlarged) dot once zoomed in; external number offset above the dot for
@@ -153,7 +155,7 @@ export const STATION_LABEL_EXTERNAL_FILTER: FilterSpecification = [
   ["any", ["get", "nearestToUser"], ["get", "nearDestination"]],
 ];
 
-/** Dot radius — enlarged (roughly 2× the old sizes) so a count fits inside once zoomed in. */
+/** Dot radius. Small; from zoom 14 the HTML count pill sits over it, so the dot is just an anchor. */
 export const STATION_CIRCLE_RADIUS: DataDrivenPropertyValueSpecification<number> = [
   "interpolate",
   ["linear"],
@@ -161,9 +163,9 @@ export const STATION_CIRCLE_RADIUS: DataDrivenPropertyValueSpecification<number>
   11,
   4,
   14,
-  11,
+  7,
   17,
-  17,
+  8,
 ];
 
 /** Color stations green (has bikes), amber (docks only, no bikes), near-black (dead: 0 bikes & 0 docks), gray (no data yet). */

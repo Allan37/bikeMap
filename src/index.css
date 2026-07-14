@@ -135,6 +135,74 @@ body,
   opacity: 1;
 }
 
+/* Citibike-style count pill (HTML marker), shown per station from zoom 14+. White pill, colored
+   icons; availability shows in the border. The map is always the light day style, so no dark variant. */
+.station-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1.5px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.28);
+  color: #16171d;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.station-pill--bikes {
+  border-color: #2e7d32;
+}
+
+.station-pill--docks-only {
+  border-color: #f9a825;
+}
+
+.station-pill--dead {
+  border-color: #3a2020;
+  color: #3a2020;
+}
+
+.pill-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.pill-ico {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.pill-ico-sm {
+  width: 11px;
+  height: 11px;
+}
+
+.pill-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom e-bike glyph: bike stacked on a sideways bolt. */
+.pill-ebike {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0;
+}
+
+.pill-bolt {
+  width: 9px;
+  height: 9px;
+  margin-top: -3px;
+  transform: rotate(90deg);
+}
+
 /* Sits below the search bar and away from the bottom-right locate button it describes. */
 .locate-error {
   position: absolute;

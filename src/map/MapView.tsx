@@ -9,18 +9,16 @@ import {
   STATION_CIRCLE_RADIUS,
   STATION_LABEL_EXTERNAL_FILTER,
   STATION_LABEL_EXTERNAL_LAYER_ID,
-  STATION_LABEL_INSIDE_FILTER,
-  STATION_LABEL_INSIDE_LAYER_ID,
-  STATION_LABEL_INSIDE_PARK_TEXT_FIELD,
-  STATION_LABEL_INSIDE_TEXT_FIELD,
   STATION_LABEL_PARK_TEXT_FIELD,
   STATION_LABEL_TEXT_FIELD,
   STATION_LAYER_ID,
+  type StationMode,
   STATION_SOURCE_ID,
   stationsToGeoJSON,
 } from "./stationLayer";
+import { stationPillHTML } from "./stationPill";
 
-export type StationMode = "bike" | "park";
+export type { StationMode };
 import { useMapboxMap } from "./useMapboxMap";
 
 // Lucide bike / zap glyphs as inline SVG for the (HTML-string) station popup — consistent with the
@@ -65,6 +63,7 @@ export function MapView({
   const { mapRef, isLoaded, locate, recenter } = useMapboxMap(containerRef, { onLocate, onLocateError, onPoiSelect });
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const pillsRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
 
   useEffect(() => {
     onLocateReady?.(locate);
@@ -95,12 +94,9 @@ export function MapView({
         "circle-stroke-color": "#ffffff",
       },
     });
-    // Count labels: external = only the nearest few stations, number floated ABOVE the dot when
-    // zoomed out; inside = every station's count centered INSIDE the enlarged dot once zoomed in
-    // (14+). text-field is swapped by the bike/park mode effect below. Always-shown so the base
-    // style's dense labels can't drop them; wrapped defensively.
+    // When zoomed out, float a number above only the nearest few stations. Zoomed in (14+), HTML
+    // count pills take over (see the pills effect below). Wrapped defensively.
     try {
-      const alwaysShow = { "text-allow-overlap": true, "text-ignore-placement": true } as const;
       map.addLayer({
         id: STATION_LABEL_EXTERNAL_LAYER_ID,
         type: "symbol",
@@ -112,22 +108,10 @@ export function MapView({
           "text-size": 12,
           "text-anchor": "bottom",
           "text-offset": [0, -0.6],
-          ...alwaysShow,
+          "text-allow-overlap": true,
+          "text-ignore-placement": true,
         },
         paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.7)", "text-halo-width": 1.6 },
-      });
-      map.addLayer({
-        id: STATION_LABEL_INSIDE_LAYER_ID,
-        type: "symbol",
-        source: STATION_SOURCE_ID,
-        minzoom: INSIDE_LABEL_MINZOOM,
-        filter: STATION_LABEL_INSIDE_FILTER,
-        layout: {
-          "text-field": STATION_LABEL_INSIDE_TEXT_FIELD,
-          "text-size": ["interpolate", ["linear"], ["zoom"], 14, 11, 17, 15],
-          ...alwaysShow,
-        },
-        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.25)", "text-halo-width": 0.8 },
       });
     } catch (err) {
       console.warn("[bikeMap] station count labels failed to initialize", err);
@@ -196,19 +180,74 @@ export function MapView({
     source?.setData(stationsToGeoJSON(stations, originCoords, destinationCoords));
   }, [stations, origin, userLocation, destination, isLoaded, mapRef]);
 
-  // Swap station count labels between bikes and open docks when the bike/park toggle changes.
+  // Swap the zoomed-out external labels between bikes and open docks on the bike/park toggle.
+  // (Zoomed-in pills read `mode` directly in the pills effect below.)
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !isLoaded || !map.getLayer(STATION_LABEL_INSIDE_LAYER_ID)) return;
+    if (!map || !isLoaded || !map.getLayer(STATION_LABEL_EXTERNAL_LAYER_ID)) return;
     try {
-      const inside = mode === "park" ? STATION_LABEL_INSIDE_PARK_TEXT_FIELD : STATION_LABEL_INSIDE_TEXT_FIELD;
       const external = mode === "park" ? STATION_LABEL_PARK_TEXT_FIELD : STATION_LABEL_TEXT_FIELD;
-      map.setLayoutProperty(STATION_LABEL_INSIDE_LAYER_ID, "text-field", inside);
       map.setLayoutProperty(STATION_LABEL_EXTERNAL_LAYER_ID, "text-field", external);
     } catch (err) {
       console.warn("[bikeMap] station label mode swap failed", err);
     }
   }, [mode, isLoaded, mapRef]);
+
+  // HTML count pills once zoomed in (14+): one per visible station, reconciled on map idle. Only
+  // stations in the source (already filtered to the nearest when routing) get a pill.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded) return;
+    const pills = pillsRef.current;
+
+    const updatePills = () => {
+      try {
+        if (map.getZoom() < INSIDE_LABEL_MINZOOM) {
+          pills.forEach((m) => m.remove());
+          pills.clear();
+          return;
+        }
+        const seen = new Set<string>();
+        for (const f of map.querySourceFeatures(STATION_SOURCE_ID)) {
+          if (f.geometry.type !== "Point") continue;
+          const p = f.properties ?? {};
+          const id = String(p.stationId ?? "");
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          let marker = pills.get(id);
+          if (!marker) {
+            marker = new mapboxgl.Marker({ element: document.createElement("div") })
+              .setLngLat(f.geometry.coordinates as [number, number])
+              .addTo(map);
+            pills.set(id, marker);
+          }
+          const el = marker.getElement();
+          el.className = `station-pill station-pill--${String(p.availability)}`;
+          el.innerHTML = stationPillHTML(
+            Number(p.bikesAvailable),
+            Number(p.ebikesAvailable),
+            Number(p.docksAvailable),
+            String(p.availability),
+            mode,
+          );
+        }
+        for (const [id, m] of pills) {
+          if (!seen.has(id)) {
+            m.remove();
+            pills.delete(id);
+          }
+        }
+      } catch (err) {
+        console.warn("[bikeMap] station pills failed", err);
+      }
+    };
+
+    map.on("idle", updatePills);
+    updatePills();
+    return () => {
+      map.off("idle", updatePills);
+    };
+  }, [isLoaded, mapRef, mode, stations]);
 
   // Drop/move a marker on the selected search destination and fly there.
   useEffect(() => {
