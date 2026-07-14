@@ -4,23 +4,23 @@ import { useEffect, useRef } from "react";
 import type { Coordinates, POI, RouteOption, Station } from "../types";
 import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
 import {
-  DETAIL_LABEL_MINZOOM,
   INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
   STATION_CIRCLE_RADIUS,
-  STATION_LABEL_DETAIL_FILTER,
-  STATION_LABEL_DETAIL_LAYER_ID,
-  STATION_LABEL_DETAIL_TEXT_FIELD,
   STATION_LABEL_EXTERNAL_FILTER,
   STATION_LABEL_EXTERNAL_LAYER_ID,
   STATION_LABEL_INSIDE_FILTER,
   STATION_LABEL_INSIDE_LAYER_ID,
+  STATION_LABEL_INSIDE_PARK_TEXT_FIELD,
   STATION_LABEL_INSIDE_TEXT_FIELD,
+  STATION_LABEL_PARK_TEXT_FIELD,
   STATION_LABEL_TEXT_FIELD,
   STATION_LAYER_ID,
   STATION_SOURCE_ID,
   stationsToGeoJSON,
 } from "./stationLayer";
+
+export type StationMode = "bike" | "park";
 import { useMapboxMap } from "./useMapboxMap";
 
 // Lucide bike / zap glyphs as inline SVG for the (HTML-string) station popup — consistent with the
@@ -37,11 +37,15 @@ interface MapViewProps {
   /** Live GPS location; drives which stations get the earlier, lower-zoom count labels. */
   userLocation: Coordinates | null;
   selectedRoute: RouteOption | null;
+  /** Whether station counts show bikes (manual/electric) or open parking docks. */
+  mode: StationMode;
   onLocate: (position: Coordinates) => void;
   onLocateError?: (message: string) => void;
   onPoiSelect?: (poi: POI) => void;
   /** Hands App a function to programmatically trigger geolocation (for the "Use current location" button). */
   onLocateReady?: (locate: () => void) => void;
+  /** Hands App a function to swoop the camera to a point (for the "pan to me" button). */
+  onRecenterReady?: (recenter: (coords: Coordinates, zoom: number) => void) => void;
 }
 
 export function MapView({
@@ -50,19 +54,25 @@ export function MapView({
   origin,
   userLocation,
   selectedRoute,
+  mode,
   onLocate,
   onLocateError,
   onPoiSelect,
   onLocateReady,
+  onRecenterReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { mapRef, isLoaded, locate } = useMapboxMap(containerRef, { onLocate, onLocateError, onPoiSelect });
+  const { mapRef, isLoaded, locate, recenter } = useMapboxMap(containerRef, { onLocate, onLocateError, onPoiSelect });
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
 
   useEffect(() => {
     onLocateReady?.(locate);
   }, [locate, onLocateReady]);
+
+  useEffect(() => {
+    onRecenterReady?.(recenter);
+  }, [recenter, onRecenterReady]);
 
   // Add the station source/layer once the map has loaded.
   useEffect(() => {
@@ -85,11 +95,10 @@ export function MapView({
         "circle-stroke-color": "#ffffff",
       },
     });
-    // Count labels in three tiers (all always-shown so the base style's dense labels can't drop
-    // them). Wrapped defensively — enrichment must never take down the core map/route layers.
-    // - external: only the nearest few stations, number floated ABOVE the dot, when zoomed out.
-    // - inside: every station, number centered INSIDE the enlarged dot, once zoomed in (14+).
-    // - detail: manual/electric/docks broken out BELOW the dot, when very close (17+).
+    // Count labels: external = only the nearest few stations, number floated ABOVE the dot when
+    // zoomed out; inside = every station's count centered INSIDE the enlarged dot once zoomed in
+    // (14+). text-field is swapped by the bike/park mode effect below. Always-shown so the base
+    // style's dense labels can't drop them; wrapped defensively.
     try {
       const alwaysShow = { "text-allow-overlap": true, "text-ignore-placement": true } as const;
       map.addLayer({
@@ -119,21 +128,6 @@ export function MapView({
           ...alwaysShow,
         },
         paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.25)", "text-halo-width": 0.8 },
-      });
-      map.addLayer({
-        id: STATION_LABEL_DETAIL_LAYER_ID,
-        type: "symbol",
-        source: STATION_SOURCE_ID,
-        minzoom: DETAIL_LABEL_MINZOOM,
-        filter: STATION_LABEL_DETAIL_FILTER,
-        layout: {
-          "text-field": STATION_LABEL_DETAIL_TEXT_FIELD,
-          "text-size": 11,
-          "text-anchor": "top",
-          "text-offset": [0, 1.4],
-          ...alwaysShow,
-        },
-        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.7)", "text-halo-width": 1.6 },
       });
     } catch (err) {
       console.warn("[bikeMap] station count labels failed to initialize", err);
@@ -196,9 +190,25 @@ export function MapView({
     const map = mapRef.current;
     if (!map || !isLoaded) return;
     const source = map.getSource(STATION_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
+    // The trip's start is a chosen departure if set, else the live GPS location.
+    const originCoords = origin ? { lat: origin.lat, lon: origin.lon } : userLocation;
     const destinationCoords = destination ? { lat: destination.lat, lon: destination.lon } : null;
-    source?.setData(stationsToGeoJSON(stations, userLocation, destinationCoords));
-  }, [stations, userLocation, destination, isLoaded, mapRef]);
+    source?.setData(stationsToGeoJSON(stations, originCoords, destinationCoords));
+  }, [stations, origin, userLocation, destination, isLoaded, mapRef]);
+
+  // Swap station count labels between bikes and open docks when the bike/park toggle changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isLoaded || !map.getLayer(STATION_LABEL_INSIDE_LAYER_ID)) return;
+    try {
+      const inside = mode === "park" ? STATION_LABEL_INSIDE_PARK_TEXT_FIELD : STATION_LABEL_INSIDE_TEXT_FIELD;
+      const external = mode === "park" ? STATION_LABEL_PARK_TEXT_FIELD : STATION_LABEL_TEXT_FIELD;
+      map.setLayoutProperty(STATION_LABEL_INSIDE_LAYER_ID, "text-field", inside);
+      map.setLayoutProperty(STATION_LABEL_EXTERNAL_LAYER_ID, "text-field", external);
+    } catch (err) {
+      console.warn("[bikeMap] station label mode swap failed", err);
+    }
+  }, [mode, isLoaded, mapRef]);
 
   // Drop/move a marker on the selected search destination and fly there.
   useEffect(() => {

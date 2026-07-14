@@ -1,5 +1,7 @@
+import { Bike, LocateFixed, SquareParking } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStations } from "./citibike/useStations";
+import { DEFAULT_MAP_ZOOM } from "./config";
 import { MapView } from "./map/MapView";
 import { PoiCard } from "./poi/PoiCard";
 import { matchBusiness, searchNearby } from "./poi/yelpClient";
@@ -40,11 +42,22 @@ function App() {
   const stationsRef = useRef(stations);
   stationsRef.current = stations;
 
-  // Programmatic geolocation trigger, handed up from the map's GeolocateControl.
+  // Whether station counts show bikes (manual/electric) or open parking docks.
+  const [mode, setMode] = useState<"bike" | "park">("bike");
+
+  // Programmatic map controls, handed up from the map.
   const locateRef = useRef<() => void>(() => {});
   const handleLocateReady = useCallback((fn: () => void) => {
     locateRef.current = fn;
   }, []);
+  const recenterRef = useRef<(coords: Coordinates, zoom: number) => void>(() => {});
+  const handleRecenterReady = useCallback((fn: (coords: Coordinates, zoom: number) => void) => {
+    recenterRef.current = fn;
+  }, []);
+  const panToSelf = useCallback(() => {
+    if (userLocation) recenterRef.current(userLocation, DEFAULT_MAP_ZOOM);
+    else locateRef.current(); // no fix yet — kick off geolocation instead
+  }, [userLocation]);
 
   // We only ever surface the single best route by time — a walk-bike-walk trip doesn't warrant a
   // pick list — so this holds just that one (getBestRoutes still ranks internally).
@@ -145,6 +158,7 @@ function App() {
         origin={origin}
         userLocation={userLocation}
         selectedRoute={bestRoute}
+        mode={mode}
         onLocate={(position) => {
           setUserLocation(position);
           setLocateError(null);
@@ -152,7 +166,22 @@ function App() {
         onLocateError={setLocateError}
         onPoiSelect={selectDestination}
         onLocateReady={handleLocateReady}
+        onRecenterReady={handleRecenterReady}
       />
+      <div className="map-controls">
+        <button
+          type="button"
+          className="map-control-button"
+          onClick={() => setMode((m) => (m === "bike" ? "park" : "bike"))}
+          aria-label={mode === "bike" ? "Show parking" : "Show bikes"}
+          title={mode === "bike" ? "Showing bikes — tap for parking" : "Showing parking — tap for bikes"}
+        >
+          {mode === "bike" ? <Bike size={22} /> : <SquareParking size={22} />}
+        </button>
+        <button type="button" className="map-control-button" onClick={panToSelf} aria-label="Center on my location">
+          <LocateFixed size={22} />
+        </button>
+      </div>
       {/* Bottom search sheet appears only when no destination is chosen; once one is, the trip
           panel takes over the bottom (clear it with × to search again). */}
       {!destination && <SearchSheet onSelect={selectDestination} />}

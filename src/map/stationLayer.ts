@@ -17,8 +17,20 @@ export const INSIDE_LABEL_MINZOOM = 14;
 export const DETAIL_LABEL_MINZOOM = 17;
 // How many of the closest-to-you stations get an external number when zoomed out past the inside tier.
 const NEAREST_LABEL_COUNT = 3;
+// When a destination is selected, only this many stations near the start and near the destination
+// are shown (the rest are cleared) — the relevant ones for the trip.
+const NEAREST_ROUTING_COUNT = 5;
 // A station within this distance of the destination shows open docks (parking) rather than bikes.
 const NEAR_DESTINATION_METERS = 400;
+
+/** Station ids of the `n` stations closest to `point`. */
+function nearestStationIds(stations: Station[], point: Coordinates, n: number): string[] {
+  return stations
+    .map((s) => ({ id: s.stationId, d: haversineDistanceMeters(point, { lat: s.lat, lon: s.lon }) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, n)
+    .map((x) => x.id);
+}
 
 export interface StationProperties {
   stationId: string;
@@ -49,17 +61,20 @@ export function stationsToGeoJSON(
   destination?: Coordinates | null,
 ): FeatureCollection<Point, StationProperties> {
   // The N stations physically closest to you — labeled externally when zoomed out.
-  const nearestIds = new Set<string>(
-    userLocation
-      ? stations
-          .map((s) => ({ id: s.stationId, d: haversineDistanceMeters(userLocation, { lat: s.lat, lon: s.lon }) }))
-          .sort((a, b) => a.d - b.d)
-          .slice(0, NEAREST_LABEL_COUNT)
-          .map((x) => x.id)
-      : [],
-  );
+  const nearestIds = new Set<string>(userLocation ? nearestStationIds(stations, userLocation, NEAREST_LABEL_COUNT) : []);
 
-  const features: Feature<Point, StationProperties>[] = stations.map((s) => ({
+  // Once a trip is chosen, clear the clutter: show only the few stations near the start and near
+  // the destination — those are the ones you'd actually use.
+  let visible = stations;
+  if (destination) {
+    const keep = new Set<string>([
+      ...(userLocation ? nearestStationIds(stations, userLocation, NEAREST_ROUTING_COUNT) : []),
+      ...nearestStationIds(stations, destination, NEAREST_ROUTING_COUNT),
+    ]);
+    visible = stations.filter((s) => keep.has(s.stationId));
+  }
+
+  const features: Feature<Point, StationProperties>[] = visible.map((s) => ({
     type: "Feature",
     geometry: { type: "Point", coordinates: [s.lon, s.lat] },
     properties: {
@@ -95,6 +110,19 @@ export const STATION_LABEL_INSIDE_TEXT_FIELD: ExpressionSpecification = [
   ["get", "nearDestination"],
   ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
   ["to-string", ["get", "bikesAvailable"]],
+];
+
+// Park mode: every station shows open docks ("12P") instead of bikes.
+export const STATION_LABEL_PARK_TEXT_FIELD: ExpressionSpecification = [
+  "concat",
+  ["to-string", ["get", "docksAvailable"]],
+  "P",
+];
+export const STATION_LABEL_INSIDE_PARK_TEXT_FIELD: ExpressionSpecification = [
+  "case",
+  ["==", ["get", "availability"], "dead"],
+  "✕",
+  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
 ];
 
 /** Detailed breakdown, e.g. "3m 2e 8p" — manual bikes, e-bikes, open docks (parking). */

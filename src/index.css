@@ -15,6 +15,40 @@ body,
   background-color: #f5f1e8;
 }
 
+/* Stacked map controls, top-right (bike/park toggle + pan-to-me). */
+.map-controls {
+  position: absolute;
+  top: calc(env(safe-area-inset-top) + 12px);
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.map-control-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: #16171d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+}
+
+@media (prefers-color-scheme: dark) {
+  .map-control-button {
+    background: rgba(40, 40, 44, 0.85);
+    color: #f3f4f6;
+  }
+}
+
 /* Tiny build identifier so you can confirm the deployed version is the latest. */
 .debug-badge {
   position: absolute;

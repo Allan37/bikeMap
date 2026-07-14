@@ -26,6 +26,11 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     geolocateRef.current?.trigger();
   }, []);
 
+  /** Swoops the camera to a point at a given zoom — used by the "pan to me" button. */
+  const recenter = useCallback((coords: Coordinates, zoom: number) => {
+    mapRef.current?.flyTo({ center: [coords.lon, coords.lat], zoom, essential: true });
+  }, []);
+
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -252,5 +257,5 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return { mapRef, isLoaded, locate };
+  return { mapRef, isLoaded, locate, recenter };
 }
