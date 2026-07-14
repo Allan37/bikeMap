@@ -216,14 +216,18 @@ export function MapView({
           seen.add(id);
           let marker = pills.get(id);
           if (!marker) {
-            marker = new mapboxgl.Marker({ element: document.createElement("div") })
+            // Root stays untouched so mapbox keeps its own `mapboxgl-marker` class (which supplies
+            // position:absolute) and positioning transform; our pill styling lives on an inner div.
+            const root = document.createElement("div");
+            root.appendChild(document.createElement("div"));
+            marker = new mapboxgl.Marker({ element: root })
               .setLngLat(f.geometry.coordinates as [number, number])
               .addTo(map);
             pills.set(id, marker);
           }
-          const el = marker.getElement();
-          el.className = `station-pill station-pill--${String(p.availability)}`;
-          el.innerHTML = stationPillHTML(
+          const inner = marker.getElement().firstElementChild as HTMLElement;
+          inner.className = `station-pill station-pill--${String(p.availability)}`;
+          inner.innerHTML = stationPillHTML(
             Number(p.bikesAvailable),
             Number(p.ebikesAvailable),
             Number(p.docksAvailable),
