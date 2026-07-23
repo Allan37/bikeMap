@@ -1,4 +1,8 @@
-import type { POI, RouteOption } from "../types";
+import { Bike, TrainFront } from "lucide-react";
+import type { Coordinates, POI, RouteOption } from "../types";
+import { appleMapsTransitUrl } from "../routing/transitLink";
+
+export type TravelMode = "bike" | "subway";
 
 interface TripPanelProps {
   destination: POI;
@@ -6,8 +10,13 @@ interface TripPanelProps {
   originLabel: string;
   /** Whether we actually have origin coordinates yet (GPS fix or a chosen start). */
   hasOrigin: boolean;
+  /** The trip's start coordinates, when known — needed for the subway handoff link. */
+  originCoords: Coordinates | null;
   /** False = show the destination summary + "Directions" CTA; true = show the trip planner. */
   showDirections: boolean;
+  /** How the user wants to get there: our own bike routing, or a handoff to transit directions. */
+  travelMode: TravelMode;
+  onTravelModeChange: (mode: TravelMode) => void;
   /** The single best route by time, or null while none is available. */
   route: RouteOption | null;
   isLoading: boolean;
@@ -34,7 +43,10 @@ export function TripPanel({
   destination,
   originLabel,
   hasOrigin,
+  originCoords,
   showDirections,
+  travelMode,
+  onTravelModeChange,
   route,
   isLoading,
   error,
@@ -71,6 +83,25 @@ export function TripPanel({
             </div>
           </div>
 
+          <div className="travel-mode-toggle" role="group" aria-label="Travel mode">
+            <button
+              type="button"
+              className={`travel-mode-option${travelMode === "bike" ? " travel-mode-option-active" : ""}`}
+              onClick={() => onTravelModeChange("bike")}
+            >
+              <Bike size={16} />
+              Bike
+            </button>
+            <button
+              type="button"
+              className={`travel-mode-option${travelMode === "subway" ? " travel-mode-option-active" : ""}`}
+              onClick={() => onTravelModeChange("subway")}
+            >
+              <TrainFront size={16} />
+              Subway
+            </button>
+          </div>
+
           {!hasOrigin ? (
             <div className="trip-origin-prompt">
               <button type="button" className="trip-directions-button" onClick={onUseCurrentLocation}>
@@ -78,6 +109,15 @@ export function TripPanel({
               </button>
               <div className="trip-panel-status trip-panel-hint">or tap “From” to pick a starting point.</div>
             </div>
+          ) : travelMode === "subway" ? (
+            <a
+              className="trip-go-button"
+              href={appleMapsTransitUrl(originCoords!, { lat: destination.lat, lon: destination.lon })}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Go · subway directions in Apple Maps →
+            </a>
           ) : isLoading ? (
             <div className="trip-panel-status">Finding the best route…</div>
           ) : error ? (

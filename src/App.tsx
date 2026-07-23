@@ -5,7 +5,7 @@ import { DEFAULT_MAP_ZOOM } from "./config";
 import { MapView } from "./map/MapView";
 import { PoiCard } from "./poi/PoiCard";
 import { matchBusiness, searchNearby } from "./poi/yelpClient";
-import { TripPanel } from "./routePanel/TripPanel";
+import { TripPanel, type TravelMode } from "./routePanel/TripPanel";
 import { getBestRoutes } from "./routing/candidateSearch";
 import { PlaceSearch } from "./search/PlaceSearch";
 import { SearchSheet } from "./search/SearchSheet";
@@ -27,6 +27,9 @@ function App() {
   const [origin, setOrigin] = useState<POI | null>(null);
   const [showDirections, setShowDirections] = useState(false);
   const [isEditingOrigin, setIsEditingOrigin] = useState(false);
+  // Bike routing (our own walk/bike/walk planner) vs. a straight handoff to Apple Maps transit
+  // directions — a standalone option, not yet combined with the bike leg (see plan.md phase 2).
+  const [travelMode, setTravelMode] = useState<TravelMode>("bike");
 
   // The trip's effective start: a chosen origin if set, otherwise the live GPS location.
   const originCoords = useMemo<Coordinates | null>(
@@ -98,9 +101,10 @@ function App() {
 
   // Recompute candidate routes whenever the trip's start or destination changes — deliberately
   // NOT on every station-data poll tick (reads stationsRef instead), since re-ranking on every
-  // poll would be both wasteful and visually jumpy.
+  // poll would be both wasteful and visually jumpy. Subway mode hands off to Apple Maps instead,
+  // so skip this entirely then — no point burning Directions API calls for a route we won't show.
   useEffect(() => {
-    if (!originCoords || !destination) {
+    if (!originCoords || !destination || travelMode !== "bike") {
       setBestRoute(null);
       return;
     }
@@ -122,7 +126,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [originCoords, destination]);
+  }, [originCoords, destination, travelMode]);
 
   // Look up a Yelp match for the selected destination (name + location), for the POI card.
   useEffect(() => {
@@ -193,7 +197,10 @@ function App() {
           destination={destination}
           originLabel={originLabel}
           hasOrigin={originCoords !== null}
+          originCoords={originCoords}
           showDirections={showDirections}
+          travelMode={travelMode}
+          onTravelModeChange={setTravelMode}
           route={bestRoute}
           isLoading={isRouteLoading}
           error={routeError}
