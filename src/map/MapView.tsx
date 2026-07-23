@@ -7,6 +7,7 @@ import {
   INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
   STATION_CIRCLE_RADIUS,
+  STATION_MIN_ZOOM,
   STATION_LABEL_EXTERNAL_FILTER,
   STATION_LABEL_EXTERNAL_LAYER_ID,
   STATION_LABEL_PARK_TEXT_FIELD,
@@ -87,6 +88,7 @@ export function MapView({
       id: STATION_LAYER_ID,
       type: "circle",
       source: STATION_SOURCE_ID,
+      minzoom: STATION_MIN_ZOOM, // hide dots entirely on a city-wide view
       paint: {
         "circle-radius": STATION_CIRCLE_RADIUS,
         "circle-color": STATION_CIRCLE_COLOR,
@@ -101,6 +103,7 @@ export function MapView({
         id: STATION_LABEL_EXTERNAL_LAYER_ID,
         type: "symbol",
         source: STATION_SOURCE_ID,
+        minzoom: STATION_MIN_ZOOM,
         maxzoom: INSIDE_LABEL_MINZOOM,
         filter: STATION_LABEL_EXTERNAL_FILTER,
         layout: {

@@ -83,7 +83,7 @@ export function TripPanel({
             </div>
           </div>
 
-          <div className="travel-mode-toggle" role="group" aria-label="Travel mode">
+          <div className="travel-mode-toggle" role="group" aria-label="Travel mode" data-active={travelMode}>
             <button
               type="button"
               className={`travel-mode-option${travelMode === "bike" ? " travel-mode-option-active" : ""}`}

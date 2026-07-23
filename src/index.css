@@ -1,6 +1,8 @@
 :root {
   color-scheme: light dark;
-  font-family: system-ui, "Segoe UI", Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 html,
@@ -9,10 +11,22 @@ body,
   margin: 0;
   height: 100dvh; /* dynamic viewport height — fills under the iOS home indicator in standalone */
   overflow: hidden;
+  overscroll-behavior: none; /* no rubber-band bounce — reads as native, not a web page */
   /* The map is always the light "day" style (cream land), so paint the page cream too. Without an
      explicit background, iOS falls back to a black backdrop in dark mode and it shows through the
      home-indicator safe area as a black bar in the installed (standalone) PWA. */
   background-color: #f5f1e8;
+  /* App chrome shouldn't be selectable or long-press-callout-able like a web page. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Text fields are the exception — they need selection/editing. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Stacked map controls, top-right (bike/park toggle + pan-to-me). */
@@ -152,6 +166,17 @@ body,
   line-height: 1;
   white-space: nowrap;
   cursor: pointer;
+}
+
+.station-pill {
+  animation: pill-pop 0.16s ease-out;
+}
+
+@keyframes pill-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.82);
+  }
 }
 
 .station-pill--bikes {
@@ -828,21 +853,41 @@ body,
   gap: 8px;
 }
 
+/* iOS-style segmented control: a single white pill slides between the two options. */
 .travel-mode-toggle {
+  position: relative;
   display: flex;
-  gap: 6px;
   padding: 3px;
   border-radius: 10px;
-  background: rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.travel-mode-toggle::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.travel-mode-toggle[data-active="subway"]::before {
+  transform: translateX(100%);
 }
 
 .travel-mode-option {
+  position: relative;
+  z-index: 1;
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
+  padding: 9px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -850,12 +895,11 @@ body,
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: color 0.2s ease;
 }
 
 .travel-mode-option-active {
-  background: #ffffff;
   color: #16171d;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
 
 .trip-panel-status {
@@ -907,10 +951,12 @@ body,
   text-decoration: none;
 }
 
-/* Smooth, tactile press feedback across tappable controls; kill the iOS grey tap flash. */
+/* Smooth, tactile press feedback across tappable controls; kill the iOS grey tap flash and the
+   300ms double-tap-zoom delay so taps feel instant. */
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .trip-directions-button,
@@ -1051,6 +1097,18 @@ a {
 
   .route-best {
     background: rgba(46, 125, 50, 0.16);
+  }
+
+  .travel-mode-toggle {
+    background: rgba(255, 255, 255, 0.08);
+  }
+
+  .travel-mode-toggle::before {
+    background: rgba(120, 120, 128, 0.55);
+  }
+
+  .travel-mode-option-active {
+    color: #ffffff;
   }
 
   .origin-editor-cancel {

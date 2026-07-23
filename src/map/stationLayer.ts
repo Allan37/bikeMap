@@ -13,6 +13,8 @@ export const STATION_LABEL_INSIDE_LAYER_ID = "citibike-station-labels-inside";
 export const STATION_LABEL_EXTERNAL_LAYER_ID = "citibike-station-labels-external";
 export const STATION_LABEL_DETAIL_LAYER_ID = "citibike-station-labels-detail";
 
+// Below this zoom, hide station dots entirely — a city-wide view shouldn't be peppered with them.
+export const STATION_MIN_ZOOM = 12;
 // From this zoom the dots are big enough to hold a count, so every station shows its number inside.
 export const INSIDE_LABEL_MINZOOM = 14;
 // Zoomed in this far, the count breaks out into manual / electric / open docks.
