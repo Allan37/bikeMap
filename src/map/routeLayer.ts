@@ -3,6 +3,7 @@ import type { RouteOption } from "../types";
 
 export const ROUTE_SOURCE_ID = "selected-route";
 export const ROUTE_LAYER_ID = "selected-route-layer";
+export const ROUTE_CASING_LAYER_ID = "selected-route-casing";
 
 interface RouteLegProperties {
   mode: "walk" | "bike";

@@ -33,12 +33,12 @@ body,
   width: 44px;
   height: 44px;
   border: none;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   color: #16171d;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
   cursor: pointer;
 }
 
@@ -581,10 +581,13 @@ body,
   right: 12px;
   z-index: 2;
   max-width: 420px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.16);
   overflow: hidden;
+  animation: trip-panel-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .poi-card-close {
@@ -688,13 +691,36 @@ body,
   bottom: calc(48px + env(safe-area-inset-bottom));
   z-index: 2;
   max-width: 420px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  padding: 20px 16px 16px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.16);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
+  animation: trip-panel-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Apple-style grab handle. */
+.trip-panel::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 36px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+@keyframes trip-panel-in {
+  from {
+    transform: translateY(14px);
+    opacity: 0;
+  }
 }
 
 .trip-panel-header {
@@ -871,7 +897,7 @@ body,
   display: block;
   width: 100%;
   box-sizing: border-box;
-  padding: 12px;
+  padding: 13px;
   border-radius: 12px;
   background: #2e7d32;
   color: #ffffff;
@@ -879,6 +905,49 @@ body,
   font-weight: 600;
   text-align: center;
   text-decoration: none;
+}
+
+/* Smooth, tactile press feedback across tappable controls; kill the iOS grey tap flash. */
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.trip-directions-button,
+.trip-go-button,
+.map-control-button,
+.travel-mode-option,
+.trip-panel-close,
+.search-pill,
+.search-sheet-cancel,
+.origin-editor-cancel,
+.trip-endpoint-editable,
+.saved-row-main,
+.saved-row-unset {
+  transition:
+    transform 0.13s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    opacity 0.13s ease;
+}
+
+.trip-directions-button:active,
+.trip-go-button:active,
+.map-control-button:active,
+.trip-panel-close:active,
+.search-pill:active {
+  transform: scale(0.96);
+}
+
+.trip-directions-button:active,
+.trip-go-button:active {
+  background: #256a29;
+}
+
+.trip-endpoint-editable:active,
+.saved-row-main:active,
+.saved-row-unset:active {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 /* Start-location editor: a top overlay reusing the place-search input. */
@@ -941,7 +1010,11 @@ body,
   }
 
   .trip-panel {
-    background: rgba(30, 31, 38, 0.97);
+    background: rgba(28, 28, 30, 0.78);
+  }
+
+  .trip-panel::before {
+    background: rgba(255, 255, 255, 0.22);
   }
 
   .trip-panel-title,
@@ -985,7 +1058,7 @@ body,
   }
 
   .poi-card {
-    background: rgba(30, 31, 38, 0.97);
+    background: rgba(28, 28, 30, 0.82);
   }
 
   .poi-card-name,

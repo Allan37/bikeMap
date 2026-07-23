@@ -2,7 +2,7 @@ import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
 import type { Coordinates, POI, RouteOption, Station } from "../types";
-import { EMPTY_ROUTE_GEOJSON, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
+import { EMPTY_ROUTE_GEOJSON, ROUTE_CASING_LAYER_ID, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
 import {
   INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
@@ -150,9 +150,20 @@ export function MapView({
         .addTo(map);
     });
 
-    // Route line source/layer — walk legs dashed, bike leg solid, styled distinctly so the
-    // three-part trip reads at a glance. Added empty; populated by the effect below.
+    // Route line source/layers — walk legs dashed, bike leg solid, styled distinctly so the
+    // three-part trip reads at a glance. A white casing beneath makes it pop off the map (Apple
+    // Maps-style). Both inserted below the station dots so those stay tappable on top.
     map.addSource(ROUTE_SOURCE_ID, { type: "geojson", data: EMPTY_ROUTE_GEOJSON });
+    map.addLayer(
+      {
+        id: ROUTE_CASING_LAYER_ID,
+        type: "line",
+        source: ROUTE_SOURCE_ID,
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 8, "line-opacity": 0.9 },
+      },
+      STATION_LAYER_ID,
+    );
     map.addLayer(
       {
         id: ROUTE_LAYER_ID,
@@ -161,11 +172,11 @@ export function MapView({
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": ["match", ["get", "mode"], "bike", "#2e7d32", "#1976d2"],
-          "line-width": 4,
+          "line-width": 5,
           "line-dasharray": ["case", ["==", ["get", "mode"], "walk"], ["literal", [2, 2]], ["literal", [1, 0]]],
         },
       },
-      STATION_LAYER_ID, // insert below the station dots so they stay tappable/visible on top
+      STATION_LAYER_ID,
     );
   }, [isLoaded, mapRef]);
 
