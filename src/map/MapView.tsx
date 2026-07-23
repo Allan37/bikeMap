@@ -171,7 +171,7 @@ export function MapView({
         source: ROUTE_SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": ["match", ["get", "mode"], "bike", "#2e7d32", "#1976d2"],
+          "line-color": ["match", ["get", "mode"], "bike", "#2e7d32", "#007aff"],
           "line-width": 5,
           "line-dasharray": ["case", ["==", ["get", "mode"], "walk"], ["literal", [2, 2]], ["literal", [1, 0]]],
         },
@@ -277,7 +277,7 @@ export function MapView({
 
     const lngLat: [number, number] = [destination.lon, destination.lat];
     if (!destinationMarkerRef.current) {
-      destinationMarkerRef.current = new mapboxgl.Marker({ color: "#1976d2" }).setLngLat(lngLat).addTo(map);
+      destinationMarkerRef.current = new mapboxgl.Marker({ color: "#007aff" }).setLngLat(lngLat).addTo(map);
     } else {
       destinationMarkerRef.current.setLngLat(lngLat);
     }

@@ -10,7 +10,7 @@ const BOLT_PATHS = `<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>`;
 const PARKING_PATHS = `<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 17V7h4a3 3 0 0 1 0 6H9"/>`;
 
 const BIKE_ICON = svg(BIKE_PATHS, "#2e7d32", "pill-ico");
-const PARK_ICON = svg(PARKING_PATHS, "#1976d2", "pill-ico");
+const PARK_ICON = svg(PARKING_PATHS, "#007aff", "pill-ico");
 // Bike on top of a sideways bolt.
 const EBIKE_ICON = `<span class="pill-ebike">${svg(BIKE_PATHS, "#2e7d32", "pill-ico pill-ico-sm")}${svg(BOLT_PATHS, "#f9a825", "pill-ico pill-bolt")}</span>`;
 

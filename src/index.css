@@ -391,7 +391,7 @@ body,
   padding: 8px 4px;
   border: none;
   background: transparent;
-  color: #1976d2;
+  color: #007aff;
   font-size: 16px;
   cursor: pointer;
 }
@@ -503,12 +503,12 @@ body,
 
 .saved-row-add {
   margin-left: auto;
-  color: #1976d2;
+  color: #007aff;
   font-size: 20px;
 }
 
 .saved-row-unset .saved-row-label {
-  color: #1976d2;
+  color: #007aff;
   font-weight: 500;
 }
 
@@ -677,7 +677,7 @@ body,
 .poi-card-yelp-link,
 .poi-card-maps-link {
   display: inline-block;
-  color: #1976d2;
+  color: #007aff;
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
@@ -817,7 +817,7 @@ body,
 
 .trip-endpoint-edit {
   flex: none;
-  color: #1976d2;
+  color: #007aff;
   font-size: 13px;
   font-weight: 600;
 }
@@ -978,7 +978,7 @@ a {
   border: none;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.95);
-  color: #1976d2;
+  color: #007aff;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -986,7 +986,7 @@ a {
 }
 
 .search-leading-option .suggestion-name {
-  color: #1976d2;
+  color: #007aff;
   font-weight: 600;
 }
 
