@@ -1,6 +1,7 @@
-import { Bike, TrainFront } from "lucide-react";
-import type { Coordinates, POI, RouteOption } from "../types";
+import { Bike, Footprints, TrainFront } from "lucide-react";
 import { appleMapsTransitUrl } from "../routing/transitLink";
+import type { TransitRoute } from "../routing/transitDirections";
+import type { Coordinates, POI, RouteOption } from "../types";
 
 export type TravelMode = "bike" | "subway";
 
@@ -21,6 +22,10 @@ interface TripPanelProps {
   route: RouteOption | null;
   isLoading: boolean;
   error: string | null;
+  /** In-app subway route (Google Directions) for subway mode. */
+  transitRoute: TransitRoute | null;
+  isTransitLoading: boolean;
+  transitError: string | null;
   onGetDirections: () => void;
   onEditOrigin: () => void;
   onUseCurrentLocation: () => void;
@@ -29,6 +34,38 @@ interface TripPanelProps {
 
 function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)} min`;
+}
+
+/** In-app subway route: total time, then colored line badges and walking legs. */
+function TransitRouteView({ route }: { route: TransitRoute }) {
+  return (
+    <div className="transit-route">
+      <div className="route-best-time">{formatMinutes(route.totalDurationSeconds)}</div>
+      <div className="transit-steps">
+        {route.steps
+          // Skip trivial connector walks so the line sequence reads cleanly.
+          .filter((s) => s.kind === "transit" || s.durationSeconds >= 60)
+          .map((s, i) =>
+            s.kind === "transit" ? (
+              <div className="transit-step" key={`${s.line}-${i}`}>
+                <span className="transit-line" style={{ background: s.lineColor ?? "#555" }}>
+                  {s.line}
+                </span>
+                <span className="transit-step-text">
+                  {s.numStops ? `${s.numStops} stop${s.numStops === 1 ? "" : "s"}` : "ride"}
+                  {s.arrivalStop ? ` → ${s.arrivalStop}` : ""}
+                </span>
+              </div>
+            ) : (
+              <div className="transit-step" key={`walk-${i}`}>
+                <Footprints size={16} className="transit-walk-icon" />
+                <span className="transit-step-text">Walk {formatMinutes(s.durationSeconds)}</span>
+              </div>
+            ),
+          )}
+      </div>
+    </div>
+  );
 }
 
 /** Deep link that opens Apple Maps directions for the bike leg — origin station to destination station. */
@@ -50,6 +87,9 @@ export function TripPanel({
   route,
   isLoading,
   error,
+  transitRoute,
+  isTransitLoading,
+  transitError,
   onGetDirections,
   onEditOrigin,
   onUseCurrentLocation,
@@ -110,14 +150,25 @@ export function TripPanel({
               <div className="trip-panel-status trip-panel-hint">or tap “From” to pick a starting point.</div>
             </div>
           ) : travelMode === "subway" ? (
-            <a
-              className="trip-go-button"
-              href={appleMapsTransitUrl(originCoords!, { lat: destination.lat, lon: destination.lon })}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Go · subway directions in Apple Maps →
-            </a>
+            isTransitLoading ? (
+              <div className="trip-panel-status">Finding a subway route…</div>
+            ) : transitError ? (
+              <div className="trip-panel-status">{transitError}</div>
+            ) : !transitRoute ? (
+              <div className="trip-panel-status">No subway route found near here.</div>
+            ) : (
+              <>
+                <TransitRouteView route={transitRoute} />
+                <a
+                  className="trip-go-button"
+                  href={appleMapsTransitUrl(originCoords!, { lat: destination.lat, lon: destination.lon })}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Go · open in Apple Maps →
+                </a>
+              </>
+            )
           ) : isLoading ? (
             <div className="trip-panel-status">Finding the best route…</div>
           ) : error ? (

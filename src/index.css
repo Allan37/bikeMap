@@ -937,6 +937,58 @@ textarea {
   margin-top: 2px;
 }
 
+/* In-app subway route card. */
+.transit-route {
+  padding: 10px 12px;
+  border: 2px solid #007aff;
+  border-radius: 12px;
+  background: rgba(0, 122, 255, 0.08);
+}
+
+.transit-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.transit-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.transit-line {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  border-radius: 11px;
+  background: #555;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.5);
+}
+
+.transit-walk-icon {
+  flex: none;
+  color: #6b6375;
+}
+
+.transit-step-text {
+  color: #16171d;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .trip-go-button {
   display: block;
   width: 100%;
@@ -1097,6 +1149,14 @@ a {
 
   .route-best {
     background: rgba(46, 125, 50, 0.16);
+  }
+
+  .transit-route {
+    background: rgba(0, 122, 255, 0.16);
+  }
+
+  .transit-step-text {
+    color: #f3f4f6;
   }
 
   .travel-mode-toggle {

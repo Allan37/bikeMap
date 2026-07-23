@@ -3,6 +3,7 @@ import { defineConfig, loadEnv, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { searchYelpBusinesses } from './api/_yelpProxy.ts'
+import { fetchTransitRoute } from './api/_transitProxy.ts'
 
 // A short build identifier shown in-app (top-left) so you can verify you're on the latest deploy.
 // Vercel exposes the commit SHA as an env var; locally we read git; time makes dev rebuilds distinct.
@@ -57,12 +58,48 @@ function yelpProxyDevMiddleware(): Plugin {
   }
 }
 
+// Mirrors api/transit-directions.ts for `npm run dev`.
+function transitProxyDevMiddleware(): Plugin {
+  return {
+    name: 'transit-proxy-dev-middleware',
+    configureServer(server) {
+      server.middlewares.use('/api/transit-directions', async (req, res) => {
+        const url = new URL(req.url ?? '', 'http://localhost')
+        const originLat = url.searchParams.get('originLat')
+        const originLon = url.searchParams.get('originLon')
+        const destLat = url.searchParams.get('destLat')
+        const destLon = url.searchParams.get('destLon')
+        res.setHeader('Content-Type', 'application/json')
+        if (!originLat || !originLon || !destLat || !destLon) {
+          res.statusCode = 400
+          res.end(JSON.stringify({ error: 'origin/dest lat/lon are required' }))
+          return
+        }
+        try {
+          const route = await fetchTransitRoute({
+            originLat: parseFloat(originLat),
+            originLon: parseFloat(originLon),
+            destLat: parseFloat(destLat),
+            destLon: parseFloat(destLon),
+          })
+          res.statusCode = 200
+          res.end(JSON.stringify({ route }))
+        } catch (err) {
+          res.statusCode = 502
+          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Transit directions failed' }))
+        }
+      })
+    },
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Vite only puts VITE_-prefixed vars on import.meta.env for client code; loadEnv with an
   // empty prefix filter reads *all* .env vars so the dev middleware above can see YELP_API_KEY.
   const env = loadEnv(mode, process.cwd(), '')
   process.env.YELP_API_KEY = env.YELP_API_KEY
+  process.env.GOOGLE_MAPS_API_KEY = env.GOOGLE_MAPS_API_KEY
 
   return {
     define: {
@@ -76,6 +113,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       yelpProxyDevMiddleware(),
+      transitProxyDevMiddleware(),
       VitePWA({
         registerType: 'autoUpdate',
         manifest: {

@@ -7,6 +7,7 @@ import { PoiCard } from "./poi/PoiCard";
 import { matchBusiness, searchNearby } from "./poi/yelpClient";
 import { TripPanel, type TravelMode } from "./routePanel/TripPanel";
 import { getBestRoutes } from "./routing/candidateSearch";
+import { fetchTransitRoute, type TransitRoute } from "./routing/transitDirections";
 import { PlaceSearch } from "./search/PlaceSearch";
 import { SearchSheet } from "./search/SearchSheet";
 import type { Coordinates, POI, RouteOption, YelpBusiness } from "./types";
@@ -68,6 +69,10 @@ function App() {
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
 
+  const [transitRoute, setTransitRoute] = useState<TransitRoute | null>(null);
+  const [isTransitLoading, setIsTransitLoading] = useState(false);
+  const [transitError, setTransitError] = useState<string | null>(null);
+
   const [poiBusiness, setPoiBusiness] = useState<YelpBusiness | null>(null);
   const [isPoiCardDismissed, setIsPoiCardDismissed] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
@@ -122,6 +127,30 @@ function App() {
       })
       .finally(() => {
         if (!cancelled) setIsRouteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originCoords, destination, travelMode]);
+
+  // Subway mode: fetch in-app transit directions (Google Directions via our proxy).
+  useEffect(() => {
+    if (!originCoords || !destination || travelMode !== "subway") {
+      setTransitRoute(null);
+      return;
+    }
+    let cancelled = false;
+    setIsTransitLoading(true);
+    setTransitError(null);
+    fetchTransitRoute(originCoords, { lat: destination.lat, lon: destination.lon })
+      .then((r) => {
+        if (!cancelled) setTransitRoute(r);
+      })
+      .catch((err) => {
+        if (!cancelled) setTransitError(err instanceof Error ? err.message : "Failed to find a subway route");
+      })
+      .finally(() => {
+        if (!cancelled) setIsTransitLoading(false);
       });
     return () => {
       cancelled = true;
@@ -204,6 +233,9 @@ function App() {
           route={bestRoute}
           isLoading={isRouteLoading}
           error={routeError}
+          transitRoute={transitRoute}
+          isTransitLoading={isTransitLoading}
+          transitError={transitError}
           onGetDirections={() => setShowDirections(true)}
           onEditOrigin={() => setIsEditingOrigin(true)}
           onUseCurrentLocation={useCurrentLocationAsStart}
