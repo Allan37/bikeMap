@@ -201,25 +201,43 @@ export function TripPanel({
               <div className="trip-panel-status">{comboError}</div>
             ) : !comboRoute ? (
               <div className="trip-panel-status">
-                The subway is already a short walk away — biking there wouldn't help. Try Bike or Subway.
+                Mixing bike + subway wouldn't meaningfully beat the subway alone here — check the Subway tab.
               </div>
             ) : (
               <>
                 <div className="combo-route">
                   <div className="route-best-time">{formatMinutes(comboRoute.totalDurationSeconds)}</div>
-                  <div className="combo-leg">
-                    <Bike size={16} className="combo-leg-icon" />
-                    <span className="transit-step-text">
-                      {formatMinutes(comboRoute.bike.totalDurationSeconds)} to {comboRoute.entryStopName} · dock at{" "}
-                      {comboRoute.bike.destinationStation.name}
-                    </span>
-                  </div>
+                  {comboRoute.startBike && (
+                    <div className="combo-leg">
+                      <Bike size={16} className="combo-leg-icon" />
+                      <span className="transit-step-text">
+                        {formatMinutes(comboRoute.startBike.totalDurationSeconds)} to {comboRoute.entryStopName} · dock
+                        at {comboRoute.startBike.destinationStation.name}
+                      </span>
+                    </div>
+                  )}
                   <TransitSteps route={comboRoute.transit} />
-                  <div className="combo-note">incl. ~3 min to dock &amp; board</div>
+                  {comboRoute.endBike && (
+                    <div className="combo-leg combo-leg--end">
+                      <Bike size={16} className="combo-leg-icon" />
+                      <span className="transit-step-text">
+                        hop off at {comboRoute.exitStopName} · bike {formatMinutes(comboRoute.endBike.totalDurationSeconds)}{" "}
+                        to destination
+                      </span>
+                    </div>
+                  )}
+                  <div className="combo-note">incl. dock &amp; platform buffers</div>
                 </div>
-                <a className="trip-go-button" href={appleMapsBikeLegUrl(comboRoute.bike)} target="_blank" rel="noreferrer">
-                  Go · bike leg in Apple Maps →
-                </a>
+                {(comboRoute.startBike ?? comboRoute.endBike) && (
+                  <a
+                    className="trip-go-button"
+                    href={appleMapsBikeLegUrl((comboRoute.startBike ?? comboRoute.endBike)!)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Go · bike leg in Apple Maps →
+                  </a>
+                )}
               </>
             )
           ) : isLoading ? (

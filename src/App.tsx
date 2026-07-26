@@ -199,9 +199,12 @@ function App() {
   const routeGeoJSON = useMemo(() => {
     if (travelMode === "bike") return bestRoute ? routeOptionToGeoJSON(bestRoute) : null;
     if (travelMode === "subway") return transitRoute ? transitRouteToGeoJSON(transitRoute) : null;
-    return comboRoute
-      ? combineRouteGeoJSON(routeOptionToGeoJSON(comboRoute.bike), transitRouteToGeoJSON(comboRoute.transit))
-      : null;
+    if (!comboRoute) return null;
+    return [
+      ...(comboRoute.startBike ? [routeOptionToGeoJSON(comboRoute.startBike)] : []),
+      transitRouteToGeoJSON(comboRoute.transit),
+      ...(comboRoute.endBike ? [routeOptionToGeoJSON(comboRoute.endBike)] : []),
+    ].reduce(combineRouteGeoJSON);
   }, [travelMode, bestRoute, transitRoute, comboRoute]);
 
   // Look up a Yelp match for the selected destination (name + location), for the POI card.

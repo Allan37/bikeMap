@@ -1018,6 +1018,15 @@ textarea {
   color: #2e7d32;
 }
 
+/* End-of-trip bike leg sits below the train steps: separator on top instead of bottom. */
+.combo-leg--end {
+  margin-top: 8px;
+  padding-top: 8px;
+  padding-bottom: 0;
+  border-bottom: none;
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
+}
+
 .combo-note {
   margin-top: 8px;
   color: #6b6375;
