@@ -49,7 +49,7 @@ function TransitRouteView({ route }: { route: TransitRoute }) {
             s.kind === "transit" ? (
               <div className="transit-step" key={`${s.line}-${i}`}>
                 <span className="transit-line" style={{ background: s.lineColor ?? "#555" }}>
-                  {s.line}
+                  {(s.line ?? "").replace(/\s*line$/i, "").trim()}
                 </span>
                 <span className="transit-step-text">
                   {s.numStops ? `${s.numStops} stop${s.numStops === 1 ? "" : "s"}` : "ride"}
