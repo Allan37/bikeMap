@@ -1,5 +1,5 @@
 import type { Feature, FeatureCollection, Point } from "geojson";
-import type { DataDrivenPropertyValueSpecification, ExpressionSpecification, FilterSpecification } from "mapbox-gl";
+import type { DataDrivenPropertyValueSpecification } from "mapbox-gl";
 import { haversineDistanceMeters } from "../routing/scoring";
 import type { Coordinates, Station } from "../types";
 
@@ -7,25 +7,13 @@ export type StationMode = "bike" | "park";
 
 export const STATION_SOURCE_ID = "citibike-stations";
 export const STATION_LAYER_ID = "citibike-stations-layer";
-// Number drawn inside the (enlarged) dot once zoomed in; external number offset above the dot for
-// the few nearest stations when zoomed out; detailed manual/electric/docks breakdown when very close.
-export const STATION_LABEL_INSIDE_LAYER_ID = "citibike-station-labels-inside";
-export const STATION_LABEL_EXTERNAL_LAYER_ID = "citibike-station-labels-external";
-export const STATION_LABEL_DETAIL_LAYER_ID = "citibike-station-labels-detail";
 
-// Below this zoom, hide station dots entirely — a city-wide view shouldn't be peppered with them.
-export const STATION_MIN_ZOOM = 12;
-// From this zoom the dots are big enough to hold a count, so every station shows its number inside.
-export const INSIDE_LABEL_MINZOOM = 14;
-// Zoomed in this far, the count breaks out into manual / electric / open docks.
-export const DETAIL_LABEL_MINZOOM = 17;
-// How many of the closest-to-you stations get an external number when zoomed out past the inside tier.
-const NEAREST_LABEL_COUNT = 3;
+// Stations are all-or-nothing: from this zoom, dots + count pills; below it, no indicators at all.
+export const STATION_PILL_MINZOOM = 14;
+
 // When a destination is selected, only this many stations near the start and near the destination
 // are shown (the rest are cleared) — the relevant ones for the trip.
 const NEAREST_ROUTING_COUNT = 5;
-// A station within this distance of the destination shows open docks (parking) rather than bikes.
-const NEAR_DESTINATION_METERS = 400;
 
 /** Station ids of the `n` stations closest to `point`. */
 function nearestStationIds(stations: Station[], point: Coordinates, n: number): string[] {
@@ -44,10 +32,6 @@ export interface StationProperties {
   docksAvailable: number;
   // Mapbox GL data-driven styling needs a flat scalar to branch on.
   availability: "bikes" | "docks-only" | "dead" | "unknown";
-  // One of the few closest stations to you — gets an external number even when zoomed out.
-  nearestToUser: boolean;
-  // Near the destination → show open docks (where you park) instead of bikes.
-  nearDestination: boolean;
 }
 
 function availabilityFor(station: Station): StationProperties["availability"] {
@@ -64,9 +48,6 @@ export function stationsToGeoJSON(
   userLocation?: Coordinates | null,
   destination?: Coordinates | null,
 ): FeatureCollection<Point, StationProperties> {
-  // The N stations physically closest to you — labeled externally when zoomed out.
-  const nearestIds = new Set<string>(userLocation ? nearestStationIds(stations, userLocation, NEAREST_LABEL_COUNT) : []);
-
   // Once a trip is chosen, clear the clutter: show only the few stations near the start and near
   // the destination — those are the ones you'd actually use.
   let visible = stations;
@@ -88,82 +69,16 @@ export function stationsToGeoJSON(
       ebikesAvailable: s.status?.ebikesAvailable ?? 0,
       docksAvailable: s.status?.docksAvailable ?? 0,
       availability: availabilityFor(s),
-      nearestToUser: nearestIds.has(s.stationId),
-      nearDestination: destination
-        ? haversineDistanceMeters(destination, { lat: s.lat, lon: s.lon }) <= NEAR_DESTINATION_METERS
-        : false,
     },
   }));
   return { type: "FeatureCollection", features };
 }
 
-/** Label text: open docks ("12P") near the destination — where you park — else the bike count. */
-export const STATION_LABEL_TEXT_FIELD: ExpressionSpecification = [
-  "case",
-  ["get", "nearDestination"],
-  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
-  ["to-string", ["get", "bikesAvailable"]],
-];
-
-/** Inside-the-dot text: a ✕ for dead stations, otherwise the count. Keeps the dead marker in the
-    same layer as the counts (not floating above every other dot). */
-export const STATION_LABEL_INSIDE_TEXT_FIELD: ExpressionSpecification = [
-  "case",
-  ["==", ["get", "availability"], "dead"],
-  "✕",
-  ["get", "nearDestination"],
-  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
-  ["to-string", ["get", "bikesAvailable"]],
-];
-
-// Park mode: every station shows open docks ("12P") instead of bikes.
-export const STATION_LABEL_PARK_TEXT_FIELD: ExpressionSpecification = [
-  "concat",
-  ["to-string", ["get", "docksAvailable"]],
-  "P",
-];
-export const STATION_LABEL_INSIDE_PARK_TEXT_FIELD: ExpressionSpecification = [
-  "case",
-  ["==", ["get", "availability"], "dead"],
-  "✕",
-  ["concat", ["to-string", ["get", "docksAvailable"]], "P"],
-];
-
-/** Detailed breakdown, e.g. "3m 2e 8p" — manual bikes, e-bikes, open docks (parking). */
-export const STATION_LABEL_DETAIL_TEXT_FIELD: ExpressionSpecification = [
-  "concat",
-  ["to-string", ["-", ["get", "bikesAvailable"], ["get", "ebikesAvailable"]]],
-  "m  ",
-  ["to-string", ["get", "ebikesAvailable"]],
-  "e  ",
-  ["to-string", ["get", "docksAvailable"]],
-  "p",
-];
-
-// External/detail labels only for stations with a live count; skip unknown/no-data.
-const HAS_DATA: FilterSpecification = ["match", ["get", "availability"], ["bikes", "docks-only"], true, false];
-// The inside layer also carries the dead ✕, so it includes dead (just not unknown/no-data).
-export const STATION_LABEL_INSIDE_FILTER: FilterSpecification = [
-  "match",
-  ["get", "availability"],
-  ["bikes", "docks-only", "dead"],
-  true,
-  false,
-];
-export const STATION_LABEL_DETAIL_FILTER: FilterSpecification = HAS_DATA;
-export const STATION_LABEL_EXTERNAL_FILTER: FilterSpecification = [
-  "all",
-  HAS_DATA,
-  ["any", ["get", "nearestToUser"], ["get", "nearDestination"]],
-];
-
-/** Dot radius. Small; from zoom 14 the HTML count pill sits over it, so the dot is just an anchor. */
+/** Dot radius — a small anchor under the HTML count pill (dots only exist at pill zooms). */
 export const STATION_CIRCLE_RADIUS: DataDrivenPropertyValueSpecification<number> = [
   "interpolate",
   ["linear"],
   ["zoom"],
-  11,
-  4,
   14,
   7,
   17,

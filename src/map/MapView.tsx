@@ -4,20 +4,16 @@ import { useEffect, useRef } from "react";
 import type { Coordinates, POI, Station } from "../types";
 import { EMPTY_ROUTE_GEOJSON, ROUTE_CASING_LAYER_ID, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, type RouteGeoJSON } from "./routeLayer";
 import {
-  INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
   STATION_CIRCLE_RADIUS,
-  STATION_MIN_ZOOM,
-  STATION_LABEL_EXTERNAL_FILTER,
-  STATION_LABEL_EXTERNAL_LAYER_ID,
-  STATION_LABEL_PARK_TEXT_FIELD,
-  STATION_LABEL_TEXT_FIELD,
   STATION_LAYER_ID,
+  STATION_PILL_MINZOOM,
   type StationMode,
   STATION_SOURCE_ID,
   stationsToGeoJSON,
 } from "./stationLayer";
 import { stationPillHTML } from "./stationPill";
+import { addSubwayLinesOverlay } from "./transitLinesLayer";
 
 export type { StationMode };
 import { useMapboxMap } from "./useMapboxMap";
@@ -42,6 +38,8 @@ interface MapViewProps {
   onLocate: (position: Coordinates) => void;
   onLocateError?: (message: string) => void;
   onPoiSelect?: (poi: POI) => void;
+  /** Fired when the user pans/zooms the camera themselves (not programmatic moves). */
+  onUserMove?: () => void;
   /** Hands App a function to programmatically trigger geolocation (for the "Use current location" button). */
   onLocateReady?: (locate: () => void) => void;
   /** Hands App a function to swoop the camera to a point (for the "pan to me" button). */
@@ -58,11 +56,17 @@ export function MapView({
   onLocate,
   onLocateError,
   onPoiSelect,
+  onUserMove,
   onLocateReady,
   onRecenterReady,
 }: MapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { mapRef, isLoaded, locate, recenter } = useMapboxMap(containerRef, { onLocate, onLocateError, onPoiSelect });
+  const { mapRef, isLoaded, locate, recenter } = useMapboxMap(containerRef, {
+    onLocate,
+    onLocateError,
+    onPoiSelect,
+    onUserMove,
+  });
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const pillsRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -89,7 +93,8 @@ export function MapView({
       id: STATION_LAYER_ID,
       type: "circle",
       source: STATION_SOURCE_ID,
-      minzoom: STATION_MIN_ZOOM, // hide dots entirely on a city-wide view
+      // Stations are all-or-nothing: below pill zoom there are no indicators at all.
+      minzoom: STATION_PILL_MINZOOM,
       paint: {
         "circle-radius": STATION_CIRCLE_RADIUS,
         "circle-color": STATION_CIRCLE_COLOR,
@@ -97,29 +102,11 @@ export function MapView({
         "circle-stroke-color": "#ffffff",
       },
     });
-    // When zoomed out, float a number above only the nearest few stations. Zoomed in (14+), HTML
-    // count pills take over (see the pills effect below). Wrapped defensively.
-    try {
-      map.addLayer({
-        id: STATION_LABEL_EXTERNAL_LAYER_ID,
-        type: "symbol",
-        source: STATION_SOURCE_ID,
-        minzoom: STATION_MIN_ZOOM,
-        maxzoom: INSIDE_LABEL_MINZOOM,
-        filter: STATION_LABEL_EXTERNAL_FILTER,
-        layout: {
-          "text-field": STATION_LABEL_TEXT_FIELD,
-          "text-size": 12,
-          "text-anchor": "bottom",
-          "text-offset": [0, -0.6],
-          "text-allow-overlap": true,
-          "text-ignore-placement": true,
-        },
-        paint: { "text-color": "#ffffff", "text-halo-color": "rgba(0, 0, 0, 0.7)", "text-halo-width": 1.6 },
-      });
-    } catch (err) {
-      console.warn("[bikeMap] station count labels failed to initialize", err);
-    }
+
+    // Colored subway-line overlay beneath the station dots. Best-effort enrichment.
+    addSubwayLinesOverlay(map, STATION_LAYER_ID).catch((err) =>
+      console.warn("[bikeMap] subway lines overlay failed", err),
+    );
 
     // Cursor feedback on hover (desktop only — touch devices have no hover, which is fine,
     // the tap-to-open-popup below works on both).
@@ -204,19 +191,6 @@ export function MapView({
     source?.setData(stationsToGeoJSON(stations, originCoords, destinationCoords));
   }, [stations, origin, userLocation, destination, isLoaded, mapRef]);
 
-  // Swap the zoomed-out external labels between bikes and open docks on the bike/park toggle.
-  // (Zoomed-in pills read `mode` directly in the pills effect below.)
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !isLoaded || !map.getLayer(STATION_LABEL_EXTERNAL_LAYER_ID)) return;
-    try {
-      const external = mode === "park" ? STATION_LABEL_PARK_TEXT_FIELD : STATION_LABEL_TEXT_FIELD;
-      map.setLayoutProperty(STATION_LABEL_EXTERNAL_LAYER_ID, "text-field", external);
-    } catch (err) {
-      console.warn("[bikeMap] station label mode swap failed", err);
-    }
-  }, [mode, isLoaded, mapRef]);
-
   // HTML count pills once zoomed in (14+): one per visible station, reconciled on map idle. Only
   // stations in the source (already filtered to the nearest when routing) get a pill.
   useEffect(() => {
@@ -226,7 +200,7 @@ export function MapView({
 
     const updatePills = () => {
       try {
-        if (map.getZoom() < INSIDE_LABEL_MINZOOM) {
+        if (map.getZoom() < STATION_PILL_MINZOOM) {
           pills.forEach((m) => m.remove());
           pills.clear();
           return;

@@ -10,6 +10,8 @@ interface UseMapboxMapCallbacks {
   onLocateError?: (message: string) => void;
   /** Fired when the user taps a POI label baked into the base map (a restaurant, shop, etc.). */
   onPoiSelect?: (poi: POI) => void;
+  /** Fired when the user moves the camera themselves (drag/pinch/scroll) — not programmatic moves. */
+  onUserMove?: () => void;
 }
 
 /** Creates a mapbox-gl map instance on the given container ref and tears it down on unmount. */
@@ -43,6 +45,12 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     });
     // No on-screen zoom/compass buttons — pinch-to-zoom and two-finger rotate (both on by
     // default) cover this on mobile without extra UI chrome.
+    // originalEvent is only present on user-initiated camera moves (drag/pinch/scroll) — flyTo and
+    // friends don't set it, so programmatic recenters won't fire this.
+    map.on("movestart", (e) => {
+      if ((e as { originalEvent?: Event }).originalEvent) callbacksRef.current.onUserMove?.();
+    });
+
     map.on("load", () => {
       setIsLoaded(true);
       // Standalone iOS PWAs launch with no resize event, so the canvas can be measured before the

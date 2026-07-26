@@ -60,10 +60,18 @@ function App() {
   const handleRecenterReady = useCallback((fn: (coords: Coordinates, zoom: number) => void) => {
     recenterRef.current = fn;
   }, []);
+  // True right after "pan to me" until the user moves the camera themselves; the button shows
+  // as inactive while true (nothing for it to do).
+  const [isCenteredOnSelf, setIsCenteredOnSelf] = useState(false);
   const panToSelf = useCallback(() => {
-    if (userLocation) recenterRef.current(userLocation, DEFAULT_MAP_ZOOM);
-    else locateRef.current(); // no fix yet — kick off geolocation instead
+    if (userLocation) {
+      recenterRef.current(userLocation, DEFAULT_MAP_ZOOM);
+      setIsCenteredOnSelf(true);
+    } else {
+      locateRef.current(); // no fix yet — kick off geolocation instead
+    }
   }, [userLocation]);
+  const handleUserMove = useCallback(() => setIsCenteredOnSelf(false), []);
 
   // We only ever surface the single best route by time — a walk-bike-walk trip doesn't warrant a
   // pick list — so this holds just that one (getBestRoutes still ranks internally).
@@ -237,6 +245,7 @@ function App() {
         }}
         onLocateError={setLocateError}
         onPoiSelect={selectDestination}
+        onUserMove={handleUserMove}
         onLocateReady={handleLocateReady}
         onRecenterReady={handleRecenterReady}
       />
@@ -250,7 +259,13 @@ function App() {
         >
           {mode === "bike" ? <Bike size={22} /> : <SquareParking size={22} />}
         </button>
-        <button type="button" className="map-control-button" onClick={panToSelf} aria-label="Center on my location">
+        <button
+          type="button"
+          className="map-control-button"
+          onClick={panToSelf}
+          disabled={isCenteredOnSelf}
+          aria-label="Center on my location"
+        >
           <LocateFixed size={22} />
         </button>
       </div>
