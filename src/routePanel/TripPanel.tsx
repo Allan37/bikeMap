@@ -1,9 +1,10 @@
-import { Bike, Footprints, TrainFront } from "lucide-react";
-import { appleMapsTransitUrl } from "../routing/transitLink";
+import { Bike, Footprints, Plus, TrainFront } from "lucide-react";
+import type { MultimodalRoute } from "../routing/multimodal";
 import type { TransitRoute } from "../routing/transitDirections";
+import { appleMapsTransitUrl } from "../routing/transitLink";
 import type { Coordinates, POI, RouteOption } from "../types";
 
-export type TravelMode = "bike" | "subway";
+export type TravelMode = "bike" | "subway" | "combo";
 
 interface TripPanelProps {
   destination: POI;
@@ -26,6 +27,10 @@ interface TripPanelProps {
   transitRoute: TransitRoute | null;
   isTransitLoading: boolean;
   transitError: string | null;
+  /** Bike-to-the-subway combined trip for combo mode. */
+  comboRoute: MultimodalRoute | null;
+  isComboLoading: boolean;
+  comboError: string | null;
   onGetDirections: () => void;
   onEditOrigin: () => void;
   onUseCurrentLocation: () => void;
@@ -36,34 +41,41 @@ function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)} min`;
 }
 
-/** In-app subway route: total time, then colored line badges and walking legs. */
+/** Step list shared by the subway and combo cards: colored line badges + walking legs. */
+function TransitSteps({ route }: { route: TransitRoute }) {
+  return (
+    <div className="transit-steps">
+      {route.steps
+        // Skip trivial connector walks so the line sequence reads cleanly.
+        .filter((s) => s.kind === "transit" || s.durationSeconds >= 60)
+        .map((s, i) =>
+          s.kind === "transit" ? (
+            <div className="transit-step" key={`${s.line}-${i}`}>
+              <span className="transit-line" style={{ background: s.lineColor ?? "#555" }}>
+                {(s.line ?? "").replace(/\s*line$/i, "").trim()}
+              </span>
+              <span className="transit-step-text">
+                {s.numStops ? `${s.numStops} stop${s.numStops === 1 ? "" : "s"}` : "ride"}
+                {s.arrivalStop ? ` → ${s.arrivalStop}` : ""}
+              </span>
+            </div>
+          ) : (
+            <div className="transit-step" key={`walk-${i}`}>
+              <Footprints size={16} className="transit-walk-icon" />
+              <span className="transit-step-text">Walk {formatMinutes(s.durationSeconds)}</span>
+            </div>
+          ),
+        )}
+    </div>
+  );
+}
+
+/** In-app subway route: total time, then the step list. */
 function TransitRouteView({ route }: { route: TransitRoute }) {
   return (
     <div className="transit-route">
       <div className="route-best-time">{formatMinutes(route.totalDurationSeconds)}</div>
-      <div className="transit-steps">
-        {route.steps
-          // Skip trivial connector walks so the line sequence reads cleanly.
-          .filter((s) => s.kind === "transit" || s.durationSeconds >= 60)
-          .map((s, i) =>
-            s.kind === "transit" ? (
-              <div className="transit-step" key={`${s.line}-${i}`}>
-                <span className="transit-line" style={{ background: s.lineColor ?? "#555" }}>
-                  {(s.line ?? "").replace(/\s*line$/i, "").trim()}
-                </span>
-                <span className="transit-step-text">
-                  {s.numStops ? `${s.numStops} stop${s.numStops === 1 ? "" : "s"}` : "ride"}
-                  {s.arrivalStop ? ` → ${s.arrivalStop}` : ""}
-                </span>
-              </div>
-            ) : (
-              <div className="transit-step" key={`walk-${i}`}>
-                <Footprints size={16} className="transit-walk-icon" />
-                <span className="transit-step-text">Walk {formatMinutes(s.durationSeconds)}</span>
-              </div>
-            ),
-          )}
-      </div>
+      <TransitSteps route={route} />
     </div>
   );
 }
@@ -90,6 +102,9 @@ export function TripPanel({
   transitRoute,
   isTransitLoading,
   transitError,
+  comboRoute,
+  isComboLoading,
+  comboError,
   onGetDirections,
   onEditOrigin,
   onUseCurrentLocation,
@@ -140,6 +155,16 @@ export function TripPanel({
               <TrainFront size={16} />
               Subway
             </button>
+            <button
+              type="button"
+              className={`travel-mode-option${travelMode === "combo" ? " travel-mode-option-active" : ""}`}
+              onClick={() => onTravelModeChange("combo")}
+              aria-label="Bike and subway combined"
+            >
+              <Bike size={15} />
+              <Plus size={11} className="travel-mode-plus" />
+              <TrainFront size={15} />
+            </button>
           </div>
 
           {!hasOrigin ? (
@@ -166,6 +191,34 @@ export function TripPanel({
                   rel="noreferrer"
                 >
                   Go · open in Apple Maps →
+                </a>
+              </>
+            )
+          ) : travelMode === "combo" ? (
+            isComboLoading ? (
+              <div className="trip-panel-status">Planning bike + subway…</div>
+            ) : comboError ? (
+              <div className="trip-panel-status">{comboError}</div>
+            ) : !comboRoute ? (
+              <div className="trip-panel-status">
+                The subway is already a short walk away — biking there wouldn't help. Try Bike or Subway.
+              </div>
+            ) : (
+              <>
+                <div className="combo-route">
+                  <div className="route-best-time">{formatMinutes(comboRoute.totalDurationSeconds)}</div>
+                  <div className="combo-leg">
+                    <Bike size={16} className="combo-leg-icon" />
+                    <span className="transit-step-text">
+                      {formatMinutes(comboRoute.bike.totalDurationSeconds)} to {comboRoute.entryStopName} · dock at{" "}
+                      {comboRoute.bike.destinationStation.name}
+                    </span>
+                  </div>
+                  <TransitSteps route={comboRoute.transit} />
+                  <div className="combo-note">incl. ~3 min to dock &amp; board</div>
+                </div>
+                <a className="trip-go-button" href={appleMapsBikeLegUrl(comboRoute.bike)} target="_blank" rel="noreferrer">
+                  Go · bike leg in Apple Maps →
                 </a>
               </>
             )

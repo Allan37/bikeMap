@@ -6,7 +6,9 @@ import { MapView } from "./map/MapView";
 import { PoiCard } from "./poi/PoiCard";
 import { matchBusiness, searchNearby } from "./poi/yelpClient";
 import { TripPanel, type TravelMode } from "./routePanel/TripPanel";
+import { combineRouteGeoJSON, routeOptionToGeoJSON, transitRouteToGeoJSON } from "./map/routeLayer";
 import { getBestRoutes } from "./routing/candidateSearch";
+import { getMultimodalRoute, type MultimodalRoute } from "./routing/multimodal";
 import { fetchTransitRoute, type TransitRoute } from "./routing/transitDirections";
 import { PlaceSearch } from "./search/PlaceSearch";
 import { SearchSheet } from "./search/SearchSheet";
@@ -72,6 +74,10 @@ function App() {
   const [transitRoute, setTransitRoute] = useState<TransitRoute | null>(null);
   const [isTransitLoading, setIsTransitLoading] = useState(false);
   const [transitError, setTransitError] = useState<string | null>(null);
+
+  const [comboRoute, setComboRoute] = useState<MultimodalRoute | null>(null);
+  const [isComboLoading, setIsComboLoading] = useState(false);
+  const [comboError, setComboError] = useState<string | null>(null);
 
   const [poiBusiness, setPoiBusiness] = useState<YelpBusiness | null>(null);
   const [isPoiCardDismissed, setIsPoiCardDismissed] = useState(false);
@@ -157,6 +163,39 @@ function App() {
     };
   }, [originCoords, destination, travelMode]);
 
+  // Combo mode: bike to the subway, then train — see routing/multimodal.ts for the algorithm.
+  useEffect(() => {
+    if (!originCoords || !destination || travelMode !== "combo") {
+      setComboRoute(null);
+      return;
+    }
+    let cancelled = false;
+    setIsComboLoading(true);
+    setComboError(null);
+    getMultimodalRoute(originCoords, { lat: destination.lat, lon: destination.lon }, stationsRef.current)
+      .then((r) => {
+        if (!cancelled) setComboRoute(r);
+      })
+      .catch((err) => {
+        if (!cancelled) setComboError(err instanceof Error ? err.message : "Failed to plan a bike + subway trip");
+      })
+      .finally(() => {
+        if (!cancelled) setIsComboLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [originCoords, destination, travelMode]);
+
+  // The active trip's drawable legs for the map, whichever mode is selected.
+  const routeGeoJSON = useMemo(() => {
+    if (travelMode === "bike") return bestRoute ? routeOptionToGeoJSON(bestRoute) : null;
+    if (travelMode === "subway") return transitRoute ? transitRouteToGeoJSON(transitRoute) : null;
+    return comboRoute
+      ? combineRouteGeoJSON(routeOptionToGeoJSON(comboRoute.bike), transitRouteToGeoJSON(comboRoute.transit))
+      : null;
+  }, [travelMode, bestRoute, transitRoute, comboRoute]);
+
   // Look up a Yelp match for the selected destination (name + location), for the POI card.
   useEffect(() => {
     setPoiBusiness(null);
@@ -190,7 +229,7 @@ function App() {
         destination={destination}
         origin={origin}
         userLocation={userLocation}
-        selectedRoute={bestRoute}
+        routeGeoJSON={routeGeoJSON}
         mode={mode}
         onLocate={(position) => {
           setUserLocation(position);
@@ -236,6 +275,9 @@ function App() {
           transitRoute={transitRoute}
           isTransitLoading={isTransitLoading}
           transitError={transitError}
+          comboRoute={comboRoute}
+          isComboLoading={isComboLoading}
+          comboError={comboError}
           onGetDirections={() => setShowDirections(true)}
           onEditOrigin={() => setIsEditingOrigin(true)}
           onUseCurrentLocation={useCurrentLocationAsStart}

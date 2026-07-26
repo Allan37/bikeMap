@@ -1,8 +1,8 @@
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { useEffect, useRef } from "react";
-import type { Coordinates, POI, RouteOption, Station } from "../types";
-import { EMPTY_ROUTE_GEOJSON, ROUTE_CASING_LAYER_ID, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, routeOptionToGeoJSON } from "./routeLayer";
+import type { Coordinates, POI, Station } from "../types";
+import { EMPTY_ROUTE_GEOJSON, ROUTE_CASING_LAYER_ID, ROUTE_LAYER_ID, ROUTE_SOURCE_ID, type RouteGeoJSON } from "./routeLayer";
 import {
   INSIDE_LABEL_MINZOOM,
   STATION_CIRCLE_COLOR,
@@ -35,7 +35,8 @@ interface MapViewProps {
   origin: POI | null;
   /** Live GPS location; drives which stations get the earlier, lower-zoom count labels. */
   userLocation: Coordinates | null;
-  selectedRoute: RouteOption | null;
+  /** The active trip's drawable legs — bike, subway, or combined — or null for none. */
+  routeGeoJSON: RouteGeoJSON | null;
   /** Whether station counts show bikes (manual/electric) or open parking docks. */
   mode: StationMode;
   onLocate: (position: Coordinates) => void;
@@ -52,7 +53,7 @@ export function MapView({
   destination,
   origin,
   userLocation,
-  selectedRoute,
+  routeGeoJSON,
   mode,
   onLocate,
   onLocateError,
@@ -174,7 +175,16 @@ export function MapView({
         source: ROUTE_SOURCE_ID,
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
-          "line-color": ["match", ["get", "mode"], "bike", "#2e7d32", "#007aff"],
+          // bike = green, train legs = the line's own brand color, walks = iOS blue (dashed).
+          "line-color": [
+            "match",
+            ["get", "mode"],
+            "bike",
+            "#2e7d32",
+            "transit",
+            ["coalesce", ["get", "lineColor"], "#555555"],
+            "#007aff",
+          ],
           "line-width": 5,
           "line-dasharray": ["case", ["==", ["get", "mode"], "walk"], ["literal", [2, 2]], ["literal", [1, 0]]],
         },
@@ -307,23 +317,22 @@ export function MapView({
     }
   }, [origin, isLoaded, mapRef]);
 
-  // Draw the selected route's legs and fit the map to show the whole trip.
+  // Draw the active trip's legs (bike, subway, or combined) and fit the map to the whole trip.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isLoaded) return;
     const source = map.getSource(ROUTE_SOURCE_ID) as mapboxgl.GeoJSONSource | undefined;
     if (!source) return;
 
-    if (!selectedRoute) {
+    if (!routeGeoJSON || routeGeoJSON.features.length === 0) {
       source.setData(EMPTY_ROUTE_GEOJSON);
       return;
     }
 
-    const geojson = routeOptionToGeoJSON(selectedRoute);
-    source.setData(geojson);
+    source.setData(routeGeoJSON);
 
     const bounds = new mapboxgl.LngLatBounds();
-    geojson.features.forEach((feature) => {
+    routeGeoJSON.features.forEach((feature) => {
       feature.geometry.coordinates.forEach((coord) => bounds.extend(coord as [number, number]));
     });
     if (!bounds.isEmpty()) {
@@ -331,7 +340,7 @@ export function MapView({
       // better tilted, and a sudden re-orient is jarring.
       map.fitBounds(bounds, { padding: 60, bearing: map.getBearing() });
     }
-  }, [selectedRoute, isLoaded, mapRef]);
+  }, [routeGeoJSON, isLoaded, mapRef]);
 
   return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
 }

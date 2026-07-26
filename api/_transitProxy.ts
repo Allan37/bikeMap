@@ -24,6 +24,11 @@ export interface TransitStep {
   departureStop?: string;
   arrivalStop?: string;
   numStops?: number;
+  /** Stop coordinates (transit steps) — the multimodal planner bikes to departureCoords. */
+  departureCoords?: { lat: number; lon: number } | null;
+  arrivalCoords?: { lat: number; lon: number } | null;
+  /** Google-encoded polyline for this step, so routes can be drawn on the map. */
+  polyline?: string | null;
 }
 
 export interface TransitRoute {
@@ -62,9 +67,12 @@ export async function fetchTransitRoute(q: TransitQuery): Promise<TransitRoute |
 
   // biome-ignore lint/suspicious/noExplicitAny: see above.
   const steps: TransitStep[] = (leg.steps ?? []).map((s: any) => {
+    const polyline = s.polyline?.points ?? null;
     if (s.travel_mode === "TRANSIT" && s.transit_details) {
       const td = s.transit_details;
       const line = td.line ?? {};
+      const toCoords = (loc: { lat?: number; lng?: number } | undefined) =>
+        loc && typeof loc.lat === "number" && typeof loc.lng === "number" ? { lat: loc.lat, lon: loc.lng } : null;
       return {
         kind: "transit",
         durationSeconds: s.duration?.value ?? 0,
@@ -75,9 +83,17 @@ export async function fetchTransitRoute(q: TransitQuery): Promise<TransitRoute |
         departureStop: td.departure_stop?.name ?? "",
         arrivalStop: td.arrival_stop?.name ?? "",
         numStops: td.num_stops ?? 0,
+        departureCoords: toCoords(td.departure_stop?.location),
+        arrivalCoords: toCoords(td.arrival_stop?.location),
+        polyline,
       };
     }
-    return { kind: "walk", durationSeconds: s.duration?.value ?? 0, instruction: stripHtml(s.html_instructions ?? "Walk") };
+    return {
+      kind: "walk",
+      durationSeconds: s.duration?.value ?? 0,
+      instruction: stripHtml(s.html_instructions ?? "Walk"),
+      polyline,
+    };
   });
 
   return {

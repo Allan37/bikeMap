@@ -57,9 +57,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // biome-ignore lint/suspicious/noExplicitAny: see above.
     const steps = (leg.steps ?? []).map((s: any) => {
+      const polyline = s.polyline?.points ?? null;
       if (s.travel_mode === "TRANSIT" && s.transit_details) {
         const td = s.transit_details;
         const line = td.line ?? {};
+        const toCoords = (loc: { lat?: number; lng?: number } | undefined) =>
+          loc && typeof loc.lat === "number" && typeof loc.lng === "number" ? { lat: loc.lat, lon: loc.lng } : null;
         return {
           kind: "transit",
           durationSeconds: s.duration?.value ?? 0,
@@ -70,9 +73,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           departureStop: td.departure_stop?.name ?? "",
           arrivalStop: td.arrival_stop?.name ?? "",
           numStops: td.num_stops ?? 0,
+          departureCoords: toCoords(td.departure_stop?.location),
+          arrivalCoords: toCoords(td.arrival_stop?.location),
+          polyline,
         };
       }
-      return { kind: "walk", durationSeconds: s.duration?.value ?? 0, instruction: stripHtml(s.html_instructions ?? "Walk") };
+      return {
+        kind: "walk",
+        durationSeconds: s.duration?.value ?? 0,
+        instruction: stripHtml(s.html_instructions ?? "Walk"),
+        polyline,
+      };
     });
 
     res.status(200).json({
