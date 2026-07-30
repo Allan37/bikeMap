@@ -82,10 +82,18 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     map.on("load", () => {
       setIsLoaded(true);
       // Standalone iOS PWAs launch with no resize event, so the canvas can be measured before the
-      // safe-area layout settles — leaving a strip of page background at the bottom. Re-measure.
+      // safe-area layout settles — leaving a strip of page background at the bottom. Re-measure a
+      // few times as the layout settles.
       map.resize();
       setTimeout(() => map.resize(), 300);
+      setTimeout(() => map.resize(), 800);
     });
+
+    // Keep the drawing buffer matched to the container whenever it changes size — the surest fix for
+    // the bottom strip of background showing through when the safe-area layout settles late (iOS
+    // standalone), and it covers device rotation too.
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    resizeObserver.observe(map.getContainer());
     mapRef.current = map;
     if (import.meta.env.DEV) (window as any).__debugMap = map; // dev-only inspection hook
 
@@ -292,6 +300,7 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
 
     return () => {
       stopTracking();
+      resizeObserver.disconnect();
       document.removeEventListener("visibilitychange", onVisibilityChange);
       window.removeEventListener("deviceorientation", onOrientation);
       window.removeEventListener("click", onFirstGesture, { capture: true });
