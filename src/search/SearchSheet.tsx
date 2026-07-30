@@ -16,7 +16,8 @@ const DEBOUNCE_MS = 250;
  * focuses (this two-stage flow avoids iOS scroll-jump on focus). Saved places live in localStorage.
  */
 export function SearchSheet({ onSelect }: SearchSheetProps) {
-  const [open, setOpen] = useState(false);
+  // Default to the half-open sheet (Apple Maps-style), not the collapsed pill.
+  const [open, setOpen] = useState(true);
   const [focused, setFocused] = useState(false);
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -55,6 +56,19 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
     setQuery("");
     setSuggestions([]);
     setAssignKind(null);
+  }
+
+  // Drop one level: full → medium (unfocus, clear query), medium → collapsed pill.
+  function collapseOneLevel() {
+    if (focused || assignKind) {
+      inputRef.current?.blur();
+      setFocused(false);
+      setQuery("");
+      setSuggestions([]);
+      setAssignKind(null);
+    } else {
+      setOpen(false);
+    }
   }
 
   async function pick(suggestion: PlaceSuggestion) {
@@ -134,7 +148,12 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
       {/* Only dim + capture taps in full-screen mode — in the half sheet the map stays interactive. */}
       {focused && <button type="button" className="search-backdrop" aria-label="Close search" onClick={closeSheet} />}
       <div className={`search-sheet${focused ? " search-sheet--full" : ""}`}>
-        <div className="search-sheet-handle" />
+        <button
+          type="button"
+          className="search-sheet-handle"
+          aria-label="Collapse search"
+          onClick={collapseOneLevel}
+        />
         <div className="search-sheet-inputrow">
           <input
             ref={inputRef}
@@ -157,20 +176,24 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
             }}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
-            type="button"
-            className="search-sheet-cancel"
-            onClick={
-              assignKind
-                ? () => {
-                    setAssignKind(null);
-                    setQuery("");
-                  }
-                : closeSheet
-            }
-          >
-            Cancel
-          </button>
+          {/* Cancel only once focused (Apple-style); the resting half-sheet has no Cancel — tap the
+              grab handle to collapse it. */}
+          {(focused || assignKind) && (
+            <button
+              type="button"
+              className="search-sheet-cancel"
+              onClick={
+                assignKind
+                  ? () => {
+                      setAssignKind(null);
+                      setQuery("");
+                    }
+                  : collapseOneLevel
+              }
+            >
+              Cancel
+            </button>
+          )}
         </div>
 
         <div className="search-sheet-body">
@@ -211,7 +234,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
               />
               {places.recents.length > 0 && <div className="search-section-title">Recents</div>}
               <ul className="search-results">
-                {places.recents.map((r, i) => (
+                {places.recents.slice(0, 2).map((r, i) => (
                   <li key={`${r.lat},${r.lon},${i}`} className="result-row" onMouseDown={() => chooseSaved(r)}>
                     <Clock size={18} className="result-icon" />
                     <div>

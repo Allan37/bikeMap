@@ -42,7 +42,11 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
       config: MAP_STYLE_CONFIG,
       center: DEFAULT_MAP_CENTER,
       zoom: DEFAULT_MAP_ZOOM,
+      // Show attribution as always-on text rather than the compact ⓘ button (still ToS-compliant;
+      // the required Mapbox/OSM credit stays visible, just without a tappable info toggle).
+      attributionControl: false,
     });
+    map.addControl(new mapboxgl.AttributionControl({ compact: false }));
     // No on-screen zoom/compass buttons — pinch-to-zoom and two-finger rotate (both on by
     // default) cover this on mobile without extra UI chrome.
     // originalEvent is only present on user-initiated camera moves (drag/pinch/scroll) — flyTo and
