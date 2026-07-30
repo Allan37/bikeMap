@@ -1,5 +1,5 @@
 import { Briefcase, Clock, House, Plus, X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
 import type { POI } from "../types";
 import { retrievePlace, searchSuggestions, type PlaceSuggestion } from "./mapboxSearch";
 import { addRecent, clearSavedPlace, getSavedPlaces, type SavedKind, setSavedPlace } from "./savedPlaces";
@@ -10,25 +10,45 @@ interface SearchSheetProps {
 
 const DEBOUNCE_MS = 250;
 
+/** Three resting heights the sheet snaps between, like Apple Maps' bottom sheet. */
+type Snap = "pill" | "medium" | "full";
+const SNAPS: Snap[] = ["full", "medium", "pill"];
+// Visible peek (px) left on screen when minimized — enough for the handle + the search field.
+const PILL_PEEK = 96;
+// Medium sheet shows ~42% of the screen (Home, Work + a couple recents).
+const MEDIUM_FRACTION = 0.42;
+const TAP_SLOP = 6;
+
+/** How far the sheet is pushed down (px) for a given snap. full = flush to the top, pill = just a peek. */
+function offsetForSnap(snap: Snap): number {
+  const h = window.innerHeight;
+  if (snap === "full") return 0;
+  if (snap === "medium") return Math.max(0, h - Math.round(h * MEDIUM_FRACTION));
+  return Math.max(0, h - PILL_PEEK);
+}
+
 /**
- * Apple-Maps-style search. Tapping the bottom pill expands a medium sheet with saved places
- * (Home/Work) + recents WITHOUT raising the keyboard; tapping the field then goes full-screen and
- * focuses (this two-stage flow avoids iOS scroll-jump on focus). Saved places live in localStorage.
+ * Apple-Maps-style draggable search sheet. One element is always mounted and slides between three
+ * snap points via a CSS transform transition; the grab handle can be dragged to any of them. Tapping
+ * the field expands to full-screen FIRST, then focuses (after the slide) so iOS has nothing to scroll
+ * into view — avoiding the focus scroll-jump. Saved places (Home/Work) + recents live in localStorage.
  */
 export function SearchSheet({ onSelect }: SearchSheetProps) {
-  // Default to the half-open sheet (Apple Maps-style), not the collapsed pill.
-  const [open, setOpen] = useState(true);
-  const [focused, setFocused] = useState(false);
+  const [snap, setSnap] = useState<Snap>("medium");
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
   // When set, a picked result is saved as Home/Work instead of navigating there.
   const [assignKind, setAssignKind] = useState<SavedKind | null>(null);
   const [places, setPlaces] = useState(() => getSavedPlaces());
+  // Live drag offset (px) while a finger is on the handle; null when resting at a snap point.
+  const [dragY, setDragY] = useState<number | null>(null);
+  const [dragging, setDragging] = useState(false);
   const sessionTokenRef = useRef(crypto.randomUUID());
   const skipNextSearchRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const pillStartYRef = useRef<number | null>(null);
-  const swipeHandledRef = useRef(false);
+  const dragRef = useRef<{ startY: number; startOffset: number; moved: number } | null>(null);
+
+  const focused = snap === "full";
 
   useEffect(() => {
     if (skipNextSearchRef.current) {
@@ -49,26 +69,69 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
     return () => clearTimeout(id);
   }, [query]);
 
-  function closeSheet() {
-    inputRef.current?.blur();
-    setOpen(false);
-    setFocused(false);
-    setQuery("");
-    setSuggestions([]);
-    setAssignKind(null);
+  /** Move to a snap point; focus the field once expanded, blur (and clear, if minimizing) otherwise. */
+  function goSnap(next: Snap) {
+    setSnap(next);
+    if (next === "full") {
+      // Focus only after the slide-up settles so iOS doesn't scroll the field into view mid-animation.
+      setTimeout(() => inputRef.current?.focus(), 320);
+    } else {
+      inputRef.current?.blur();
+      if (next === "pill") {
+        setQuery("");
+        setSuggestions([]);
+        setAssignKind(null);
+      }
+    }
   }
 
-  // Drop one level: full → medium (unfocus, clear query), medium → collapsed pill.
+  // Grab-handle tap: drop one level (full → medium → pill; a tap on the pill nudges it back to medium).
   function collapseOneLevel() {
-    if (focused || assignKind) {
-      inputRef.current?.blur();
-      setFocused(false);
-      setQuery("");
-      setSuggestions([]);
+    if (assignKind) {
       setAssignKind(null);
-    } else {
-      setOpen(false);
+      setQuery("");
     }
+    goSnap(snap === "full" ? "medium" : snap === "medium" ? "pill" : "medium");
+  }
+
+  function onHandleDown(e: ReactPointerEvent<HTMLButtonElement>) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const startOffset = offsetForSnap(snap);
+    dragRef.current = { startY: e.clientY, startOffset, moved: 0 };
+    setDragging(true);
+    setDragY(startOffset);
+  }
+  function onHandleMove(e: ReactPointerEvent<HTMLButtonElement>) {
+    const d = dragRef.current;
+    if (!d) return;
+    const dy = e.clientY - d.startY;
+    d.moved = Math.max(d.moved, Math.abs(dy));
+    const next = Math.min(Math.max(d.startOffset + dy, 0), offsetForSnap("pill"));
+    setDragY(next);
+  }
+  function onHandleUp() {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDragging(false);
+    if (!d) return;
+    if (d.moved < TAP_SLOP) {
+      setDragY(null);
+      collapseOneLevel();
+      return;
+    }
+    // Released mid-drag → snap to whichever rest point is nearest the current offset.
+    const cur = dragY ?? d.startOffset;
+    let best: Snap = "medium";
+    let bestDist = Infinity;
+    for (const s of SNAPS) {
+      const dist = Math.abs(offsetForSnap(s) - cur);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = s;
+      }
+    }
+    setDragY(null);
+    goSnap(best);
   }
 
   async function pick(suggestion: PlaceSuggestion) {
@@ -84,8 +147,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
         setSuggestions([]);
       } else {
         addRecent(poi);
-        onSelect(poi);
-        closeSheet();
+        onSelect(poi); // App swaps the sheet out for the trip panel, so no need to collapse here.
       }
     } catch (err) {
       console.error("Failed to retrieve place:", err);
@@ -95,64 +157,39 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   function chooseSaved(poi: POI) {
     addRecent(poi);
     onSelect(poi);
-    closeSheet();
   }
 
   function startAssign(kind: SavedKind) {
     setAssignKind(kind);
     setQuery("");
     setSuggestions([]);
-    setFocused(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  }
-
-  if (!open) {
-    // Swipe up on the pill → half sheet (saved places, no keyboard). Tap → full-screen search.
-    return (
-      <button
-        type="button"
-        className="search-pill"
-        onPointerDown={(e) => {
-          pillStartYRef.current = e.clientY;
-        }}
-        onPointerUp={(e) => {
-          const start = pillStartYRef.current;
-          pillStartYRef.current = null;
-          if (start != null && start - e.clientY > 24) {
-            // A swipe up → half sheet (saved places, no keyboard); suppress the click that follows.
-            swipeHandledRef.current = true;
-            setOpen(true);
-          }
-        }}
-        onClick={() => {
-          if (swipeHandledRef.current) {
-            swipeHandledRef.current = false;
-            return;
-          }
-          // A tap → full-screen search.
-          setOpen(true);
-          setFocused(true);
-          setTimeout(() => inputRef.current?.focus(), 60);
-        }}
-      >
-        Search Maps
-      </button>
-    );
+    goSnap("full");
   }
 
   const showResults = query.trim().length > 0;
   const placeholder = assignKind ? `Set ${assignKind} address` : "Search Maps";
+  const offset = dragY ?? offsetForSnap(snap);
 
   return (
     <>
-      {/* Only dim + capture taps in full-screen mode — in the half sheet the map stays interactive. */}
-      {focused && <button type="button" className="search-backdrop" aria-label="Close search" onClick={closeSheet} />}
-      <div className={`search-sheet${focused ? " search-sheet--full" : ""}`}>
+      {/* Only dim + capture taps in full-screen mode — in the half/pill states the map stays interactive. */}
+      {focused && (
+        <button type="button" className="search-backdrop" aria-label="Close search" onClick={() => goSnap("medium")} />
+      )}
+      <div
+        className="search-sheet"
+        data-snap={snap}
+        data-dragging={dragging}
+        style={{ transform: `translateY(${offset}px)` }}
+      >
         <button
           type="button"
           className="search-sheet-handle"
-          aria-label="Collapse search"
-          onClick={collapseOneLevel}
+          aria-label="Resize search"
+          onPointerDown={onHandleDown}
+          onPointerMove={onHandleMove}
+          onPointerUp={onHandleUp}
+          onPointerCancel={onHandleUp}
         />
         <div className="search-sheet-inputrow">
           <input
@@ -166,18 +203,25 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
             autoCapitalize="none"
             spellCheck={false}
             enterKeyHint="search"
+            onPointerDown={(e) => {
+              // From a resting state, expand to full-screen BEFORE focusing (goSnap focuses once the
+              // slide finishes). Blocking the native focus here is what prevents the iOS scroll-jump.
+              if (snap !== "full") {
+                e.preventDefault();
+                goSnap("full");
+              }
+            }}
             onFocus={() => {
-              setFocused(true);
-              // iOS scrolls the whole page up to reveal a focused field even when it's already at
-              // the top; snap the window back (now and after the keyboard animates) to counter it.
+              if (snap !== "full") setSnap("full");
+              // Belt-and-suspenders: snap the window back in case iOS still nudged it to reveal the field.
               const toTop = () => window.scrollTo(0, 0);
               requestAnimationFrame(toTop);
               setTimeout(toTop, 300);
             }}
             onChange={(e) => setQuery(e.target.value)}
           />
-          {/* Cancel only once focused (Apple-style); the resting half-sheet has no Cancel — tap the
-              grab handle to collapse it. */}
+          {/* Cancel only while searching/assigning (Apple-style); the resting sheet has none — drag the
+              handle to minimize. */}
           {(focused || assignKind) && (
             <button
               type="button"
@@ -188,7 +232,7 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
                       setAssignKind(null);
                       setQuery("");
                     }
-                  : collapseOneLevel
+                  : () => goSnap("medium")
               }
             >
               Cancel

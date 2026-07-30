@@ -322,31 +322,6 @@ textarea {
 }
 
 /* Collapsed pill. Sits above the Mapbox logo/attribution (bottom: keeps them visible, per ToS). */
-.search-pill {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: max(4px, calc(env(safe-area-inset-bottom) - 20px));
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 150px;
-  max-width: min(64vw, 260px);
-  padding: 15px 20px;
-  border: none;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
-  color: #6b6375;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
 .search-backdrop {
   position: fixed;
   inset: 0;
@@ -363,20 +338,16 @@ textarea {
   }
 }
 
-@keyframes search-slide-up {
-  from {
-    transform: translateY(100%);
-  }
-}
-
+/* One always-mounted sheet the full height of the screen; a transform slides it between snap points
+   (pill / medium / full). See SearchSheet.tsx for the offsets. */
 .search-sheet {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  top: 0;
+  height: 100dvh;
   z-index: 5;
-  max-height: 42vh; /* half-sheet: room for Home, Work + ~2 recents, not the whole map */
-  animation: search-slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
   display: flex;
   flex-direction: column;
   padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
@@ -387,10 +358,14 @@ textarea {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* Grows toward full-screen once the user starts typing, for more result context. */
-.search-sheet--full {
-  top: calc(env(safe-area-inset-top) + 8px);
-  max-height: none;
+/* No transition while a finger is dragging the handle — the sheet tracks the finger 1:1. */
+.search-sheet[data-dragging="true"] {
+  transition: none;
+}
+
+/* Full-screen: push content below the notch/status bar (the medium/pill peeks sit well below it). */
+.search-sheet[data-snap="full"] {
+  padding-top: calc(env(safe-area-inset-top) + 8px);
 }
 
 .search-sheet-handle {
@@ -403,7 +378,8 @@ textarea {
   border: none;
   border-radius: 3px;
   background: rgba(0, 0, 0, 0.18);
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none; /* let the handle own vertical drags instead of scrolling the page */
 }
 
 /* Bigger invisible hit area around the thin handle bar. */
@@ -573,11 +549,6 @@ textarea {
 }
 
 @media (prefers-color-scheme: dark) {
-  .search-pill {
-    background: rgba(40, 40, 44, 0.8);
-    color: #c7c7cc;
-  }
-
   .search-sheet {
     background: rgba(28, 28, 30, 0.92);
   }
@@ -1085,7 +1056,6 @@ a {
 .map-control-button,
 .travel-mode-option,
 .trip-panel-close,
-.search-pill,
 .search-sheet-cancel,
 .origin-editor-cancel,
 .trip-endpoint-editable,
@@ -1101,8 +1071,7 @@ a {
 .trip-directions-button:active,
 .trip-go-button:active,
 .map-control-button:active,
-.trip-panel-close:active,
-.search-pill:active {
+.trip-panel-close:active {
   transform: scale(0.96);
 }
 

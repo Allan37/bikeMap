@@ -55,13 +55,24 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
       if ((e as { originalEvent?: Event }).originalEvent) callbacksRef.current.onUserMove?.();
     });
 
+    // The bottom ~42% of the screen is covered by the search sheet / trip panel, so bias the map's
+    // notion of "center" upward by that much. Then centering on the user (auto-locate, pan-to-me,
+    // the geolocate flyTo) lands the dot in the middle of the *visible* map — about 3/4 up the
+    // screen — instead of behind the sheet. Persisted padding is respected by all camera moves.
+    const applyBottomPadding = () => {
+      const h = map.getContainer().clientHeight;
+      map.setPadding({ top: 0, right: 0, left: 0, bottom: Math.round(h * 0.42) });
+    };
+
     map.on("load", () => {
       setIsLoaded(true);
+      applyBottomPadding();
       // Standalone iOS PWAs launch with no resize event, so the canvas can be measured before the
       // safe-area layout settles — leaving a strip of page background at the bottom. Re-measure.
       map.resize();
       setTimeout(() => map.resize(), 300);
     });
+    map.on("resize", applyBottomPadding);
     mapRef.current = map;
     if (import.meta.env.DEV) (window as any).__debugMap = map; // dev-only inspection hook
 
