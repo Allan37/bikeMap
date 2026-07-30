@@ -59,9 +59,15 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     // notion of "center" upward by that much. Then centering on the user (auto-locate, pan-to-me,
     // the geolocate flyTo) lands the dot in the middle of the *visible* map — about 3/4 up the
     // screen — instead of behind the sheet. Persisted padding is respected by all camera moves.
+    // setPadding recentres the camera immediately — so calling it redundantly (the two resize()
+    // calls below both fire "resize") would cut off an in-flight locate flyTo, leaving the user
+    // stranded mid-pan. Only apply it when the value actually changes.
+    let lastBottomPadding = -1;
     const applyBottomPadding = () => {
-      const h = map.getContainer().clientHeight;
-      map.setPadding({ top: 0, right: 0, left: 0, bottom: Math.round(h * 0.42) });
+      const bottom = Math.round(map.getContainer().clientHeight * 0.42);
+      if (bottom === lastBottomPadding) return;
+      lastBottomPadding = bottom;
+      map.setPadding({ top: 0, right: 0, left: 0, bottom });
     };
 
     map.on("load", () => {
