@@ -52,6 +52,19 @@ textarea {
   display: none;
 }
 
+/* Mapbox requires the attribution stay visible, but its default semi-opaque white pill reads as a
+   stray white bar along the bottom on mobile. Keep the credit text (ToS-compliant), drop the
+   background so it's just faint text over the map. Mapbox's own `.mapboxgl-ctrl.mapboxgl-ctrl-attrib`
+   rule ties this one's specificity and loads later, so !important is needed to win. */
+.mapboxgl-ctrl.mapboxgl-ctrl-attrib {
+  background: transparent !important;
+  padding: 0 6px;
+  font-size: 10px;
+}
+.mapboxgl-ctrl.mapboxgl-ctrl-attrib a {
+  color: rgba(60, 60, 67, 0.55);
+}
+
 .map-control-button {
   display: flex;
   align-items: center;
@@ -399,8 +412,10 @@ textarea {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* No transition while a finger is dragging the handle — the sheet tracks the finger 1:1. */
-.search-sheet[data-dragging="true"] {
+/* No transition while a finger is dragging the handle (tracks the finger 1:1), or on tap-to-open
+   (the sheet fills instantly so the keyboard rises against a settled layout, not a sliding sheet). */
+.search-sheet[data-dragging="true"],
+.search-sheet[data-instant="true"] {
   transition: none;
 }
 

@@ -51,6 +51,11 @@ function App() {
   // Whether station counts show bikes (manual/electric) or open parking docks.
   const [mode, setMode] = useState<"bike" | "park">("bike");
 
+  // How much of the screen the bottom search sheet covers (0 = minimized pill, ~0.42 = half sheet).
+  // Feeds the map so "center on me" lands the dot in the visible area above the sheet.
+  const [sheetCoverage, setSheetCoverage] = useState(0.42);
+  const handleCoverageChange = useCallback((fraction: number) => setSheetCoverage(fraction), []);
+
   // Programmatic map controls, handed up from the map.
   const locateRef = useRef<() => void>(() => {});
   const handleLocateReady = useCallback((fn: () => void) => {
@@ -242,6 +247,8 @@ function App() {
         userLocation={userLocation}
         routeGeoJSON={routeGeoJSON}
         mode={mode}
+        // Once a destination is chosen the trip panel replaces the sheet; assume ~half coverage then.
+        bottomFraction={destination ? 0.42 : sheetCoverage}
         onLocate={(position) => {
           setUserLocation(position);
           setLocateError(null);
@@ -274,7 +281,7 @@ function App() {
       </div>
       {/* Bottom search sheet appears only when no destination is chosen; once one is, the trip
           panel takes over the bottom (clear it with × to search again). */}
-      {!destination && <SearchSheet onSelect={selectDestination} />}
+      {!destination && <SearchSheet onSelect={selectDestination} onCoverageChange={handleCoverageChange} />}
       {poiBusiness && !isPoiCardDismissed && !showDirections && (
         <PoiCard business={poiBusiness} onClose={() => setIsPoiCardDismissed(true)} />
       )}

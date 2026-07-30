@@ -35,6 +35,8 @@ interface MapViewProps {
   routeGeoJSON: RouteGeoJSON | null;
   /** Whether station counts show bikes (manual/electric) or open parking docks. */
   mode: StationMode;
+  /** Fraction of the screen covered by the bottom sheet/panel — biases "center on me" upward. */
+  bottomFraction?: number;
   onLocate: (position: Coordinates) => void;
   onLocateError?: (message: string) => void;
   onPoiSelect?: (poi: POI) => void;
@@ -53,6 +55,7 @@ export function MapView({
   userLocation,
   routeGeoJSON,
   mode,
+  bottomFraction,
   onLocate,
   onLocateError,
   onPoiSelect,
@@ -66,6 +69,7 @@ export function MapView({
     onLocateError,
     onPoiSelect,
     onUserMove,
+    bottomFraction,
   });
   const destinationMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const originMarkerRef = useRef<mapboxgl.Marker | null>(null);

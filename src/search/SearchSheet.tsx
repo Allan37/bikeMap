@@ -6,6 +6,9 @@ import { addRecent, clearSavedPlace, getSavedPlaces, type SavedKind, setSavedPla
 
 interface SearchSheetProps {
   onSelect: (poi: POI) => void;
+  /** Reports how much of the screen the sheet covers (0 pill, ~0.42 half) so the map can bias
+   *  "center on me" above it. */
+  onCoverageChange?: (fraction: number) => void;
 }
 
 const DEBOUNCE_MS = 250;
@@ -36,7 +39,7 @@ function offsetForSnap(snap: Snap): number {
  * focus() call that happens within a user gesture, so we never defer it. Saved places live in
  * localStorage.
  */
-export function SearchSheet({ onSelect }: SearchSheetProps) {
+export function SearchSheet({ onSelect, onCoverageChange }: SearchSheetProps) {
   const [snap, setSnap] = useState<Snap>("medium");
   const [query, setQuery] = useState("");
   const [suggestions, setSuggestions] = useState<PlaceSuggestion[]>([]);
@@ -46,6 +49,10 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   // Live drag offset (px) while a finger is on the handle; null when resting at a snap point.
   const [dragY, setDragY] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  // When true, the sheet jumps without its transform transition — used for tap-to-open so the
+  // page is filled BEFORE the keyboard rises, instead of the sheet sliding up as the keyboard
+  // animates (the two fighting is what made the field jitter on focus).
+  const [instant, setInstant] = useState(false);
   const sessionTokenRef = useRef(crypto.randomUUID());
   const skipNextSearchRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -53,6 +60,11 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
   const pillSwipeRef = useRef<number | null>(null);
 
   const focused = snap === "full";
+
+  // Tell the map how much it's covered so "center on me" lands the dot in the visible area.
+  useEffect(() => {
+    onCoverageChange?.(snap === "pill" ? 0 : MEDIUM_FRACTION);
+  }, [snap, onCoverageChange]);
 
   useEffect(() => {
     if (skipNextSearchRef.current) {
@@ -73,20 +85,28 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
     return () => clearTimeout(id);
   }, [query]);
 
-  /** iOS tries to scroll a focused field into view; the page can't scroll (body is locked), but pin
-   *  it to the top anyway for a few hundred ms to absorb any stray scroll while the keyboard opens. */
+  /** iOS may nudge the page to scroll a focused field into view; the page can't really scroll (body
+   *  is locked), so a couple of gentle scroll-to-top calls absorb any stray offset as the keyboard
+   *  opens — without the per-scroll-event yanking that itself caused visible jitter. */
   function pinScrollTop() {
     const pin = () => window.scrollTo(0, 0);
     pin();
     requestAnimationFrame(pin);
-    const onScroll = () => pin();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    setTimeout(() => window.removeEventListener("scroll", onScroll), 550);
+    setTimeout(pin, 300);
   }
 
-  /** Expand to full-screen and raise the keyboard. MUST be called synchronously from a tap handler. */
-  function openFull() {
+  /** Fill the page to full-screen instantly (no slide), so the keyboard rises against a settled
+   *  layout rather than a sliding sheet. Re-enables the transition next frame for later drags. */
+  function fillInstant() {
+    setInstant(true);
     setSnap("full");
+    requestAnimationFrame(() => setInstant(false));
+  }
+
+  /** Expand to full-screen and raise the keyboard. MUST be called synchronously from a tap handler —
+   *  iOS only opens the keyboard for a focus() that happens inside the originating user gesture. */
+  function openFull() {
+    fillInstant();
     inputRef.current?.focus();
     pinScrollTop();
   }
@@ -231,7 +251,13 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
         Search Maps
       </button>
 
-      <div className="search-sheet" data-snap={snap} data-dragging={dragging} style={{ transform: `translateY(${offset}px)` }}>
+      <div
+        className="search-sheet"
+        data-snap={snap}
+        data-dragging={dragging}
+        data-instant={instant}
+        style={{ transform: `translateY(${offset}px)` }}
+      >
         <button
           type="button"
           className="search-sheet-handle"
@@ -255,8 +281,8 @@ export function SearchSheet({ onSelect }: SearchSheetProps) {
             enterKeyHint="search"
             onFocus={() => {
               // Native focus (from tapping the field) is already inside the gesture, so the keyboard
-              // opens; just expand the sheet and pin the scroll position.
-              if (snap !== "full") setSnap("full");
+              // opens; fill the page instantly (no slide) and pin the scroll position.
+              if (snap !== "full") fillInstant();
               pinScrollTop();
             }}
             onChange={(e) => setQuery(e.target.value)}

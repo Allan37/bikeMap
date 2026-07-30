@@ -12,6 +12,10 @@ interface UseMapboxMapCallbacks {
   onPoiSelect?: (poi: POI) => void;
   /** Fired when the user moves the camera themselves (drag/pinch/scroll) — not programmatic moves. */
   onUserMove?: () => void;
+  /** Fraction of the screen (from the bottom) covered by the search sheet / trip panel. Centering
+   *  on the user biases the camera up by this much so the dot lands in the visible map. 0 = dead
+   *  centre (pill/minimized), ~0.42 = 3/4 up (half sheet). */
+  bottomFraction?: number;
 }
 
 /** Creates a mapbox-gl map instance on the given container ref and tears it down on unmount. */
@@ -28,9 +32,19 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     geolocateRef.current?.trigger();
   }, []);
 
-  /** Swoops the camera to a point at a given zoom — used by the "pan to me" button. */
+  /** Swoops the camera to a point at a given zoom — used by the "pan to me" button. Biases the
+   *  camera up by the current sheet coverage so the dot lands in the visible map (dead centre when
+   *  minimized, ~3/4 up under the half sheet). */
   const recenter = useCallback((coords: Coordinates, zoom: number) => {
-    mapRef.current?.flyTo({ center: [coords.lon, coords.lat], zoom, essential: true });
+    const map = mapRef.current;
+    if (!map) return;
+    const bottom = Math.round(map.getContainer().clientHeight * (callbacksRef.current.bottomFraction ?? 0.42));
+    map.flyTo({
+      center: [coords.lon, coords.lat],
+      zoom,
+      essential: true,
+      padding: { top: 0, left: 0, right: 0, bottom },
+    });
   }, []);
 
   useEffect(() => {
@@ -51,34 +65,27 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
     // default) cover this on mobile without extra UI chrome.
     // originalEvent is only present on user-initiated camera moves (drag/pinch/scroll) — flyTo and
     // friends don't set it, so programmatic recenters won't fire this.
+    // Tracks the last time the user moved the camera themselves, so the locate re-assert below can
+    // bow out if the user has already grabbed the map.
+    let lastUserInteraction = 0;
     map.on("movestart", (e) => {
-      if ((e as { originalEvent?: Event }).originalEvent) callbacksRef.current.onUserMove?.();
+      if ((e as { originalEvent?: Event }).originalEvent) {
+        lastUserInteraction = Date.now();
+        callbacksRef.current.onUserMove?.();
+      }
     });
 
     // The bottom ~42% of the screen is covered by the search sheet / trip panel, so bias the map's
     // notion of "center" upward by that much. Then centering on the user (auto-locate, pan-to-me,
     // the geolocate flyTo) lands the dot in the middle of the *visible* map — about 3/4 up the
     // screen — instead of behind the sheet. Persisted padding is respected by all camera moves.
-    // setPadding recentres the camera immediately — so calling it redundantly (the two resize()
-    // calls below both fire "resize") would cut off an in-flight locate flyTo, leaving the user
-    // stranded mid-pan. Only apply it when the value actually changes.
-    let lastBottomPadding = -1;
-    const applyBottomPadding = () => {
-      const bottom = Math.round(map.getContainer().clientHeight * 0.42);
-      if (bottom === lastBottomPadding) return;
-      lastBottomPadding = bottom;
-      map.setPadding({ top: 0, right: 0, left: 0, bottom });
-    };
-
     map.on("load", () => {
       setIsLoaded(true);
-      applyBottomPadding();
       // Standalone iOS PWAs launch with no resize event, so the canvas can be measured before the
       // safe-area layout settles — leaving a strip of page background at the bottom. Re-measure.
       map.resize();
       setTimeout(() => map.resize(), 300);
     });
-    map.on("resize", applyBottomPadding);
     mapRef.current = map;
     if (import.meta.env.DEV) (window as any).__debugMap = map; // dev-only inspection hook
 
@@ -214,7 +221,18 @@ export function useMapboxMap(containerRef: React.RefObject<HTMLDivElement | null
       const { latitude, longitude } = position.coords;
       showDot(latitude, longitude);
       pushToRouting(latitude, longitude, true); // user asked to locate — update routing now
-      map.flyTo({ center: [longitude, latitude] }); // recenter only on an explicit locate, not the loop
+      // Recenter only on an explicit locate, not the tracking loop. Bias up by the sheet coverage so
+      // the dot lands in the visible map.
+      const bottom = Math.round(map.getContainer().clientHeight * (callbacksRef.current.bottomFraction ?? 0.42));
+      const flyOpts = { center: [longitude, latitude] as [number, number], padding: { top: 0, left: 0, right: 0, bottom } };
+      const flyAt = Date.now();
+      map.flyTo(flyOpts);
+      // Re-assert once shortly after: on launch, safe-area settling / late layout can interrupt the
+      // first fly and leave the camera parked mid-pan. A second identical fly finishes the job —
+      // unless the user has grabbed the map in the meantime, in which case leave them be.
+      setTimeout(() => {
+        if (lastUserInteraction <= flyAt) map.flyTo(flyOpts);
+      }, 400);
       trackingEnabled = true;
       startTracking();
     });
