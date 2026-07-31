@@ -34,6 +34,10 @@ export interface POI {
   placeFormatted: string;
   lat: number;
   lon: number;
+  /** The place's own website, when Mapbox provides it in the POI metadata. */
+  website?: string;
+  /** A human-readable category (e.g. "restaurant"), when available. */
+  category?: string;
 }
 
 export interface RouteLeg {

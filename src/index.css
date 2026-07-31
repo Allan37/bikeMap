@@ -371,9 +371,13 @@ textarea {
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
+  /* Shrinks + drops + fades as it hands off to the rising sheet (and vice-versa) so pill ⇄ half
+     reads as one connected motion, not two separate elements. */
+  transform: translateX(-50%) translateY(16px) scale(0.86);
+  transform-origin: bottom center;
   transition:
-    opacity 0.26s ease,
-    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 0.24s ease,
+    transform 0.4s cubic-bezier(0.32, 1.12, 0.4, 1);
 }
 
 /* Little grabber line at the top of the pill — the same "you can drag this" affordance as the sheet. */
@@ -386,7 +390,7 @@ textarea {
 
 .search-pill.is-visible {
   opacity: 1;
-  transform: translateX(-50%) translateY(0);
+  transform: translateX(-50%) translateY(0) scale(1);
   pointer-events: auto;
 }
 
@@ -398,12 +402,12 @@ textarea {
    (pill / medium / full). See SearchSheet.tsx for the offsets. */
 .search-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
+  left: 8px;
+  right: 8px;
   top: 0;
   height: 100dvh;
   z-index: 5;
-  transition: transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.4s cubic-bezier(0.32, 1.12, 0.4, 1);
   display: flex;
   flex-direction: column;
   padding: 8px 14px calc(12px + env(safe-area-inset-bottom));
@@ -638,140 +642,38 @@ textarea {
   font-size: 13px;
 }
 
-.poi-card {
+/* Apple-Maps-style bottom sheet: place card (name + Directions/Website + Yelp details) that flips
+   to the directions planner. Small side margins + sits low, matching the search sheet. */
+.place-panel {
   position: absolute;
-  top: calc(78px + env(safe-area-inset-top));
-  left: 12px;
-  right: 12px;
+  left: 10px;
+  right: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom));
   z-index: 2;
-  max-width: 420px;
-  border-radius: 18px;
+  max-width: 440px;
+  padding: 22px 16px 16px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.16);
-  overflow: hidden;
-  animation: trip-panel-in 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.poi-card-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.5);
-  color: #ffffff;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.poi-card-photo {
-  display: block;
-  width: 100%;
-  height: 140px;
-  object-fit: cover;
-}
-
-.poi-card-body {
-  padding: 12px 14px;
-}
-
-.poi-card-name {
-  color: #16171d;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.poi-card-subtitle {
-  color: #6b6375;
-  font-size: 13px;
-  margin-top: 2px;
-}
-
-.poi-card-rating {
-  margin-top: 6px;
-  font-size: 13px;
-  color: #6b6375;
-}
-
-.poi-card-stars {
-  color: #f9a825;
-  letter-spacing: 1px;
-}
-
-.poi-card-stars-empty {
-  color: #d8d8d8;
-}
-
-.poi-card-rating-number {
-  color: #16171d;
-  font-weight: 600;
-  margin-left: 4px;
-}
-
-.poi-card-open {
-  color: #2e7d32;
-  font-weight: 600;
-}
-
-.poi-card-closed {
-  color: #c62828;
-  font-weight: 600;
-}
-
-.poi-card-address,
-.poi-card-phone {
-  color: #6b6375;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.poi-card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  margin-top: 10px;
-}
-
-.poi-card-yelp-link,
-.poi-card-maps-link {
-  display: inline-block;
-  color: #007aff;
-  font-size: 13px;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-/* Bottom sheet: destination summary → "Directions" → editable From/To + route options. */
-.trip-panel {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: calc(48px + env(safe-area-inset-bottom));
-  z-index: 2;
-  max-width: 420px;
-  padding: 20px 16px 16px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  box-shadow: 0 8px 34px rgba(0, 0, 0, 0.16);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.18);
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  animation: trip-panel-in 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  gap: 12px;
+  animation: place-panel-in 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Apple-style grab handle. */
-.trip-panel::before {
-  content: "";
+@keyframes place-panel-in {
+  from {
+    transform: translateY(20px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+/* Grab handle. */
+.place-grabber {
   position: absolute;
-  top: 7px;
+  top: 8px;
   left: 50%;
   transform: translateX(-50%);
   width: 36px;
@@ -780,55 +682,131 @@ textarea {
   background: rgba(0, 0, 0, 0.16);
 }
 
-@keyframes trip-panel-in {
-  from {
-    transform: translateY(14px);
-    opacity: 0;
-  }
-}
-
-.trip-panel-header {
+/* Circular close/back button, top-right — icon is flex-centered so it sits dead centre. */
+.place-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 1;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.trip-panel-title {
-  color: #16171d;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.trip-panel-close {
-  flex: none;
-  width: 28px;
-  height: 28px;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.08);
-  color: #16171d;
-  font-size: 18px;
-  line-height: 1;
+  background: rgba(120, 120, 128, 0.2);
+  color: #3c3c43;
   cursor: pointer;
 }
 
-.trip-panel-subtitle {
+.place-title {
+  padding-right: 38px; /* clear the close button */
+  color: #16171d;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.place-sub {
+  margin-top: -4px;
   color: #6b6375;
   font-size: 13px;
-  margin-top: -6px;
+  text-transform: capitalize;
 }
 
-.trip-directions-button {
-  width: 100%;
-  padding: 12px;
+/* Directions / Website action row — side-by-side filled buttons. */
+.place-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.place-action {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 42px;
   border: none;
-  border-radius: 12px;
-  background: #2e7d32;
-  color: #ffffff;
-  font-size: 16px;
+  border-radius: 11px;
+  font-size: 15px;
   font-weight: 600;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.place-action-primary {
+  background: #007aff;
+  color: #ffffff;
+}
+
+.place-action-secondary {
+  background: rgba(120, 120, 128, 0.16);
+  color: #007aff;
+}
+
+/* Yelp details beneath the buttons. */
+.place-details {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.place-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  font-size: 13px;
+  color: #6b6375;
+}
+
+.place-stars {
+  color: #f9a825;
+  letter-spacing: 1px;
+}
+
+.place-stars-empty {
+  color: #d8d8d8;
+}
+
+.place-meta-rating {
+  color: #16171d;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.place-open {
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.place-closed {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.place-photo {
+  display: block;
+  width: 100%;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.place-address {
+  color: #6b6375;
+  font-size: 13px;
+}
+
+.place-phone,
+.place-yelp-link {
+  color: #007aff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .trip-endpoints {
@@ -1096,12 +1074,11 @@ a {
   touch-action: manipulation;
 }
 
-.trip-directions-button,
+.place-action,
 .trip-go-button,
 .map-control-button,
 .travel-mode-option,
-.trip-panel-close,
-.search-sheet-cancel,
+.place-close,
 .origin-editor-cancel,
 .trip-endpoint-editable,
 .saved-row-main,
@@ -1113,14 +1090,17 @@ a {
     opacity 0.13s ease;
 }
 
-.trip-directions-button:active,
+.place-action:active,
 .trip-go-button:active,
 .map-control-button:active,
-.trip-panel-close:active {
+.place-close:active {
   transform: scale(0.96);
 }
 
-.trip-directions-button:active,
+.place-action-primary:active {
+  background: #0062cc;
+}
+
 .trip-go-button:active {
   background: #256a29;
 }
@@ -1190,21 +1170,35 @@ a {
     color: #f3f4f6;
   }
 
-  .trip-panel {
-    background: rgba(28, 28, 30, 0.78);
+  .place-panel {
+    background: rgba(28, 28, 30, 0.86);
   }
 
-  .trip-panel::before {
+  .place-grabber {
     background: rgba(255, 255, 255, 0.22);
   }
 
-  .trip-panel-title,
+  .place-title,
   .route-best-time {
     color: #f3f4f6;
   }
 
-  .trip-panel-close {
-    background: rgba(255, 255, 255, 0.14);
+  .place-close {
+    background: rgba(255, 255, 255, 0.16);
+    color: #e5e5ea;
+  }
+
+  .place-action-secondary {
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .place-address,
+  .place-sub,
+  .place-meta {
+    color: #a8a8ad;
+  }
+
+  .place-meta-rating {
     color: #f3f4f6;
   }
 
@@ -1266,12 +1260,4 @@ a {
     background: rgba(30, 31, 38, 0.95);
   }
 
-  .poi-card {
-    background: rgba(28, 28, 30, 0.82);
-  }
-
-  .poi-card-name,
-  .poi-card-rating-number {
-    color: #f3f4f6;
-  }
 }

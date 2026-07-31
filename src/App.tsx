@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useStations } from "./citibike/useStations";
 import { DEFAULT_MAP_ZOOM } from "./config";
 import { MapView } from "./map/MapView";
-import { PoiCard } from "./poi/PoiCard";
 import { matchBusiness, searchNearby } from "./poi/yelpClient";
 import { TripPanel, type TravelMode } from "./routePanel/TripPanel";
 import { combineRouteGeoJSON, routeOptionToGeoJSON, transitRouteToGeoJSON } from "./map/routeLayer";
@@ -93,7 +92,6 @@ function App() {
   const [comboError, setComboError] = useState<string | null>(null);
 
   const [poiBusiness, setPoiBusiness] = useState<YelpBusiness | null>(null);
-  const [isPoiCardDismissed, setIsPoiCardDismissed] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
 
   // Selecting a destination (via search or a map POI tap) shows its summary first; the user
@@ -215,7 +213,6 @@ function App() {
   // Look up a Yelp match for the selected destination (name + location), for the POI card.
   useEffect(() => {
     setPoiBusiness(null);
-    setIsPoiCardDismissed(false);
     if (!destination) return;
     let cancelled = false;
     searchNearby(destination.lat, destination.lon, destination.name)
@@ -308,15 +305,14 @@ function App() {
       {/* Bottom search sheet appears only when no destination is chosen; once one is, the trip
           panel takes over the bottom (clear it with × to search again). */}
       {!destination && <SearchSheet onSelect={selectDestination} onCoverageChange={handleCoverageChange} />}
-      {poiBusiness && !isPoiCardDismissed && !showDirections && (
-        <PoiCard business={poiBusiness} onClose={() => setIsPoiCardDismissed(true)} />
-      )}
       {destination && (
         <TripPanel
           destination={destination}
           originLabel={originLabel}
           hasOrigin={originCoords !== null}
           originCoords={originCoords}
+          userLocation={userLocation}
+          business={poiBusiness}
           showDirections={showDirections}
           travelMode={travelMode}
           onTravelModeChange={setTravelMode}
@@ -330,6 +326,7 @@ function App() {
           isComboLoading={isComboLoading}
           comboError={comboError}
           onGetDirections={() => setShowDirections(true)}
+          onBackToVenue={() => setShowDirections(false)}
           onEditOrigin={() => setIsEditingOrigin(true)}
           onUseCurrentLocation={useCurrentLocationAsStart}
           onClear={clearDestination}

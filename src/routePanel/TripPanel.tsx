@@ -1,8 +1,9 @@
-import { Bike, Footprints, Plus, TrainFront } from "lucide-react";
+import { Bike, Footprints, Globe, Navigation, Plus, TrainFront, X } from "lucide-react";
 import type { MultimodalRoute } from "../routing/multimodal";
+import { haversineDistanceMeters } from "../routing/scoring";
 import type { TransitRoute } from "../routing/transitDirections";
 import { appleMapsTransitUrl } from "../routing/transitLink";
-import type { Coordinates, POI, RouteOption } from "../types";
+import type { Coordinates, POI, RouteOption, YelpBusiness } from "../types";
 
 export type TravelMode = "bike" | "subway" | "combo";
 
@@ -14,7 +15,11 @@ interface TripPanelProps {
   hasOrigin: boolean;
   /** The trip's start coordinates, when known — needed for the subway handoff link. */
   originCoords: Coordinates | null;
-  /** False = show the destination summary + "Directions" CTA; true = show the trip planner. */
+  /** Live GPS location, for the "X mi away" distance on the venue card. */
+  userLocation: Coordinates | null;
+  /** Yelp match for the destination (rating, price, photo, …), or null if none. */
+  business: YelpBusiness | null;
+  /** False = show the place card; true = show the directions planner. */
   showDirections: boolean;
   /** How the user wants to get there: our own bike routing, or a handoff to transit directions. */
   travelMode: TravelMode;
@@ -32,6 +37,8 @@ interface TripPanelProps {
   isComboLoading: boolean;
   comboError: string | null;
   onGetDirections: () => void;
+  /** Back from the directions view to the place card. */
+  onBackToVenue: () => void;
   onEditOrigin: () => void;
   onUseCurrentLocation: () => void;
   onClear: () => void;
@@ -39,6 +46,21 @@ interface TripPanelProps {
 
 function formatMinutes(seconds: number): string {
   return `${Math.round(seconds / 60)} min`;
+}
+
+function formatMiles(meters: number): string {
+  const mi = meters / 1609.34;
+  return mi < 0.1 ? `${Math.round(meters / 0.3048)} ft` : `${mi.toFixed(1)} mi`;
+}
+
+function Stars({ rating }: { rating: number }) {
+  const filled = Math.round(rating);
+  return (
+    <span className="place-stars" aria-hidden="true">
+      {"★★★★★".slice(0, filled)}
+      <span className="place-stars-empty">{"★★★★★".slice(filled)}</span>
+    </span>
+  );
 }
 
 /** Step list shared by the subway and combo cards: colored line badges + walking legs. */
@@ -88,11 +110,70 @@ function appleMapsBikeLegUrl(route: RouteOption): string {
   return `https://maps.apple.com/?saddr=${o.lat},${o.lon}&daddr=${d.lat},${d.lon}`;
 }
 
+/** Apple-Maps-style place card: name, action buttons, then Yelp details. */
+function VenueView({
+  destination,
+  business,
+  distanceMeters,
+  onGetDirections,
+}: {
+  destination: POI;
+  business: YelpBusiness | null;
+  distanceMeters: number | null;
+  onGetDirections: () => void;
+}) {
+  const subtitleParts = [destination.category, business?.price].filter(Boolean);
+  return (
+    <>
+      <div className="place-title">{destination.name}</div>
+      {subtitleParts.length > 0 && <div className="place-sub">{subtitleParts.join(" · ")}</div>}
+      {!subtitleParts.length && destination.placeFormatted && <div className="place-sub">{destination.placeFormatted}</div>}
+
+      <div className="place-actions">
+        <button type="button" className="place-action place-action-primary" onClick={onGetDirections}>
+          <Navigation size={17} fill="currentColor" />
+          Directions
+        </button>
+        {destination.website && (
+          <a className="place-action place-action-secondary" href={destination.website} target="_blank" rel="noreferrer">
+            <Globe size={17} />
+            Website
+          </a>
+        )}
+      </div>
+
+      {business && (
+        <div className="place-details">
+          <div className="place-meta">
+            <Stars rating={business.rating} />
+            <span className="place-meta-rating">{business.rating.toFixed(1)}</span>
+            <span className="place-meta-count">({business.reviewCount})</span>
+            {distanceMeters != null && <span className="place-meta-dot">· {formatMiles(distanceMeters)}</span>}
+            {business.isOpenNow !== null && (
+              <span className={business.isOpenNow ? "place-open" : "place-closed"}>
+                · {business.isOpenNow ? "Open" : "Closed"}
+              </span>
+            )}
+          </div>
+          {business.imageUrl && <img className="place-photo" src={business.imageUrl} alt="" />}
+          <div className="place-address">{business.address}</div>
+          {business.phone && <a className="place-phone" href={`tel:${business.phone}`}>{business.phone}</a>}
+          <a className="place-yelp-link" href={business.yelpUrl} target="_blank" rel="noreferrer">
+            View on Yelp →
+          </a>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function TripPanel({
   destination,
   originLabel,
   hasOrigin,
   originCoords,
+  userLocation,
+  business,
   showDirections,
   travelMode,
   onTravelModeChange,
@@ -106,26 +187,37 @@ export function TripPanel({
   isComboLoading,
   comboError,
   onGetDirections,
+  onBackToVenue,
   onEditOrigin,
   onUseCurrentLocation,
   onClear,
 }: TripPanelProps) {
+  const distanceMeters = userLocation ? haversineDistanceMeters(userLocation, { lat: destination.lat, lon: destination.lon }) : null;
+
   return (
-    <div className="trip-panel">
-      <div className="trip-panel-header">
-        <div className="trip-panel-title">{destination.name}</div>
-        <button type="button" className="trip-panel-close" onClick={onClear} aria-label="Clear destination">
-          ×
-        </button>
-      </div>
-      {destination.placeFormatted && <div className="trip-panel-subtitle">{destination.placeFormatted}</div>}
+    <div className="place-panel" data-view={showDirections ? "directions" : "venue"}>
+      <div className="place-grabber" />
+      {/* Venue card: X dismisses. Directions view: X steps back to the card. */}
+      <button
+        type="button"
+        className="place-close"
+        onClick={showDirections ? onBackToVenue : onClear}
+        aria-label={showDirections ? "Back" : "Close"}
+      >
+        <X size={17} strokeWidth={2.5} />
+      </button>
 
       {!showDirections ? (
-        <button type="button" className="trip-directions-button" onClick={onGetDirections}>
-          Directions
-        </button>
+        <VenueView
+          destination={destination}
+          business={business}
+          distanceMeters={distanceMeters}
+          onGetDirections={onGetDirections}
+        />
       ) : (
         <>
+          <div className="place-title">{destination.name}</div>
+
           <div className="trip-endpoints">
             <button type="button" className="trip-endpoint trip-endpoint-editable" onClick={onEditOrigin}>
               <span className="trip-endpoint-label">From</span>
@@ -169,7 +261,7 @@ export function TripPanel({
 
           {!hasOrigin ? (
             <div className="trip-origin-prompt">
-              <button type="button" className="trip-directions-button" onClick={onUseCurrentLocation}>
+              <button type="button" className="place-action place-action-primary" onClick={onUseCurrentLocation}>
                 Use current location
               </button>
               <div className="trip-panel-status trip-panel-hint">or tap “From” to pick a starting point.</div>

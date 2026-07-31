@@ -24,6 +24,8 @@ interface RawRetrieveFeature {
     name: string;
     place_formatted?: string;
     coordinates: { longitude: number; latitude: number };
+    poi_category?: string[];
+    metadata?: { website?: string };
   };
 }
 
@@ -73,5 +75,7 @@ export async function retrievePlace(mapboxId: string, sessionToken: string): Pro
     placeFormatted: feature.properties.place_formatted ?? "",
     lat: feature.properties.coordinates.latitude,
     lon: feature.properties.coordinates.longitude,
+    website: feature.properties.metadata?.website,
+    category: feature.properties.poi_category?.[0],
   };
 }
