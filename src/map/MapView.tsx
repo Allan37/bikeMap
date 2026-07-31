@@ -320,5 +320,13 @@ export function MapView({
     }
   }, [routeGeoJSON, isLoaded, mapRef]);
 
-  return <div ref={containerRef} style={{ position: "absolute", inset: 0 }} />;
+  // Inline positioning (beats Mapbox's own `.mapboxgl-map { position: relative }`, which loads after
+  // our CSS). The negative bottom pushes the map under the home indicator so it fills the whole
+  // screen; env() is 0 where there's no inset (desktop), and the 0px fallback keeps calc() valid.
+  return (
+    <div
+      ref={containerRef}
+      style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: "calc(-1 * env(safe-area-inset-bottom, 0px))" }}
+    />
+  );
 }

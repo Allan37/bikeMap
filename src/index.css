@@ -65,6 +65,14 @@ textarea {
   color: rgba(60, 60, 67, 0.55);
 }
 
+/* The map container now extends under the home indicator, which would drag Mapbox's bottom controls
+   (the attribution) down under it too — lift them back above the safe-area inset so the required
+   credit stays visible. */
+.mapboxgl-ctrl-bottom-left,
+.mapboxgl-ctrl-bottom-right {
+  bottom: env(safe-area-inset-bottom);
+}
+
 .map-control-button {
   display: flex;
   align-items: center;
