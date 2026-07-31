@@ -352,13 +352,15 @@ textarea {
   transform: translateX(-50%) translateY(14px);
   z-index: 5;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 7px;
   min-width: 150px;
   max-width: min(62vw, 240px);
-  padding: 14px 22px;
+  padding: 10px 22px 12px;
   border: none;
-  border-radius: 999px;
+  border-radius: 22px;
   background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -374,6 +376,14 @@ textarea {
     transform 0.34s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* Little grabber line at the top of the pill — the same "you can drag this" affordance as the sheet. */
+.search-pill-grip {
+  width: 34px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
 .search-pill.is-visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
@@ -382,22 +392,6 @@ textarea {
 
 .search-pill.is-visible:active {
   transform: translateX(-50%) scale(0.96);
-}
-
-.search-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 4;
-  border: none;
-  padding: 0;
-  background: rgba(0, 0, 0, 0.12);
-  animation: search-fade-in 0.25s ease;
-}
-
-@keyframes search-fade-in {
-  from {
-    opacity: 0;
-  }
 }
 
 /* One always-mounted sheet the full height of the screen; a transform slides it between snap points
@@ -420,16 +414,9 @@ textarea {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* No transition while a finger is dragging the handle (tracks the finger 1:1), or on tap-to-open
-   (the sheet fills instantly so the keyboard rises against a settled layout, not a sliding sheet). */
-.search-sheet[data-dragging="true"],
-.search-sheet[data-instant="true"] {
+/* No transition while a finger is dragging the sheet — it tracks the finger 1:1. */
+.search-sheet[data-dragging="true"] {
   transition: none;
-}
-
-/* Full-screen: push content below the notch/status bar (the medium/pill peeks sit well below it). */
-.search-sheet[data-snap="full"] {
-  padding-top: calc(env(safe-area-inset-top) + 8px);
 }
 
 .search-sheet-handle {
@@ -457,6 +444,7 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  touch-action: none; /* vertical drags here move the sheet, not scroll */
 }
 
 .search-sheet-input {
@@ -474,20 +462,14 @@ textarea {
   outline: 2px solid #2e7d32;
 }
 
-.search-sheet-cancel {
-  flex: none;
-  padding: 8px 4px;
-  border: none;
-  background: transparent;
-  color: #007aff;
-  font-size: 16px;
-  cursor: pointer;
-}
-
 .search-sheet-body {
   margin-top: 10px;
   flex: 1;
   overflow-y: auto;
+  /* Scrolls vertically; the sheet-drag logic only takes over when it's already at the top and pulled
+     down (see SearchSheet.tsx). Contain so an overscroll doesn't bounce the page behind it. */
+  touch-action: pan-y;
+  overscroll-behavior: contain;
 }
 
 .search-results {
@@ -600,18 +582,6 @@ textarea {
   font-weight: 500;
 }
 
-.saved-row-clear {
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.06);
-  color: #6b6375;
-  font-size: 16px;
-  cursor: pointer;
-}
-
 @media (prefers-color-scheme: dark) {
   .search-pill {
     background: rgba(40, 40, 44, 0.8);
@@ -642,6 +612,10 @@ textarea {
 
   .saved-row-label {
     color: #f3f4f6;
+  }
+
+  .search-pill-grip {
+    background: rgba(255, 255, 255, 0.3);
   }
 
   .saved-row-clear {
