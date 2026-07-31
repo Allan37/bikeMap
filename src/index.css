@@ -414,8 +414,10 @@ textarea {
   box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
 }
 
-/* No transition while a finger is dragging the sheet — it tracks the finger 1:1. */
-.search-sheet[data-dragging="true"] {
+/* No transition while a finger is dragging the sheet (tracks the finger 1:1), or on tap-to-open
+   (jumps to full so only the keyboard animates, not a sliding sheet). */
+.search-sheet[data-dragging="true"],
+.search-sheet[data-instant="true"] {
   transition: none;
 }
 

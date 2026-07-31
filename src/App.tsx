@@ -238,6 +238,32 @@ function App() {
     return () => clearInterval(id);
   }, []);
 
+  // TEMP diagnostic: reads the actual safe-area / viewport numbers on-device so we can size the
+  // bottom fill exactly (env() appears to report 0 in the installed PWA). Shown in the debug badge.
+  const [safeDiag, setSafeDiag] = useState("");
+  useEffect(() => {
+    const probe = document.createElement("div");
+    probe.style.cssText =
+      "position:fixed;left:0;bottom:0;width:0;height:env(safe-area-inset-bottom);visibility:hidden;pointer-events:none;";
+    document.body.appendChild(probe);
+    const read = () => {
+      const sab = Math.round(probe.getBoundingClientRect().height);
+      const vv = window.visualViewport;
+      const standalone = window.matchMedia("(display-mode: standalone)").matches ? 1 : 0;
+      setSafeDiag(
+        `sab${sab} ih${window.innerHeight} sh${Math.round(window.screen.height)} vv${vv ? Math.round(vv.height) : "-"} sa${standalone}`,
+      );
+    };
+    read();
+    window.addEventListener("resize", read);
+    window.visualViewport?.addEventListener("resize", read);
+    return () => {
+      window.removeEventListener("resize", read);
+      window.visualViewport?.removeEventListener("resize", read);
+      probe.remove();
+    };
+  }, []);
+
   return (
     <div style={{ position: "fixed", inset: 0 }}>
       <MapView
@@ -335,7 +361,9 @@ function App() {
             ? `data ${formatAge(now - lastUpdated.getTime())} old`
             : "Loading…"}
       </div>
-      <div className="debug-badge">{__BUILD_ID__}</div>
+      <div className="debug-badge">
+        {__BUILD_ID__} · {safeDiag}
+      </div>
     </div>
   );
 }

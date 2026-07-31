@@ -69,6 +69,9 @@ export function SearchSheet({ onSelect, onCoverageChange }: SearchSheetProps) {
   // Live drag offset (px) while a finger is dragging the sheet; null when resting at a snap point.
   const [dragY, setDragY] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
+  // Snap to full with no slide (used on tap-to-open) so ONLY the keyboard animates — a sliding sheet
+  // racing the keyboard rise is what read as jitter.
+  const [instant, setInstant] = useState(false);
   const sessionTokenRef = useRef(crypto.randomUUID());
   const skipNextSearchRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -110,12 +113,19 @@ export function SearchSheet({ onSelect, onCoverageChange }: SearchSheetProps) {
     setTimeout(pin, 300);
   }
 
-  /** Raise the keyboard now (must be inside the tap gesture — iOS only opens it then), then slide the
-   *  sheet up to full a beat later so the keyboard-rise and the slide don't animate at the same time. */
+  /** Jump straight to full with no slide animation (for tap-to-open). */
+  function fillInstant() {
+    setInstant(true);
+    setSnap("full");
+    requestAnimationFrame(() => setInstant(false));
+  }
+
+  /** Raise the keyboard now (must be inside the tap gesture — iOS only opens it then) and put the
+   *  sheet at full instantly, so the only thing animating is the keyboard sliding up. */
   function openFull() {
     inputRef.current?.focus();
     pinScrollTop();
-    setTimeout(() => setSnap("full"), 100);
+    fillInstant();
   }
 
   /** Move to a rest point without focusing (used for collapses and snap-after-drag). */
@@ -297,6 +307,7 @@ export function SearchSheet({ onSelect, onCoverageChange }: SearchSheetProps) {
         className="search-sheet"
         data-snap={snap}
         data-dragging={dragging}
+        data-instant={instant}
         style={{ transform: `translateY(${offset}px)` }}
         onPointerDown={onSheetPointerDown}
         onPointerMove={onSheetPointerMove}
@@ -318,9 +329,9 @@ export function SearchSheet({ onSelect, onCoverageChange }: SearchSheetProps) {
             enterKeyHint="search"
             onFocus={() => {
               // Native focus (from tapping the field) already opened the keyboard inside the gesture;
-              // slide up to full a beat later so the two animations don't collide, and pin the scroll.
+              // jump to full instantly so only the keyboard animates, and pin the scroll.
               pinScrollTop();
-              if (snap !== "full") setTimeout(() => setSnap("full"), 100);
+              if (snap !== "full") fillInstant();
             }}
             onChange={(e) => setQuery(e.target.value)}
           />
