@@ -64,7 +64,8 @@ export async function fetchTransitRoute(origin: Coordinates, destination: Coordi
   });
   const response = await fetch(`/api/transit-directions?${params}`);
   if (!response.ok) {
-    throw new Error(`Transit directions failed: ${response.status}`);
+    const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? `Transit directions failed: ${response.status}`);
   }
   const body = (await response.json()) as { route: TransitRoute | null };
   return body.route;

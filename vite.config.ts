@@ -5,6 +5,23 @@ import { VitePWA } from 'vite-plugin-pwa'
 import { searchYelpBusinesses } from './api/_yelpProxy.ts'
 import { fetchTransitRoute } from './api/_transitProxy.ts'
 
+const MAX_SEARCH_TERM_LENGTH = 160
+
+function parseCoordinate(value: string | null, min: number, max: number): number | null {
+  if (!value?.trim()) return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= min && parsed <= max ? parsed : null
+}
+
+function sendJsonError(res: { statusCode: number; end: (body: string) => void }, status: number, code: string, message: string) {
+  res.statusCode = status
+  res.end(JSON.stringify({ error: { code, message } }))
+}
+
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Upstream request timed out'
+}
+
 // A short build identifier shown in-app (top-left) so you can verify you're on the latest deploy.
 // Vercel exposes the commit SHA as an env var; locally we read git; time makes dev rebuilds distinct.
 function buildId(): string {
@@ -36,22 +53,25 @@ function yelpProxyDevMiddleware(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/yelp-search', async (req, res) => {
         const url = new URL(req.url ?? '', 'http://localhost')
-        const lat = url.searchParams.get('lat')
-        const lon = url.searchParams.get('lon')
+        const lat = parseCoordinate(url.searchParams.get('lat'), -90, 90)
+        const lon = parseCoordinate(url.searchParams.get('lon'), -180, 180)
         const term = url.searchParams.get('term') ?? undefined
         res.setHeader('Content-Type', 'application/json')
-        if (!lat || !lon) {
-          res.statusCode = 400
-          res.end(JSON.stringify({ error: 'lat and lon query params are required' }))
+        if (lat === null || lon === null) {
+          sendJsonError(res, 400, 'INVALID_COORDINATES', 'lat and lon must be finite coordinates within their valid ranges')
+          return
+        }
+        if (term !== undefined && term.length > MAX_SEARCH_TERM_LENGTH) {
+          sendJsonError(res, 400, 'INVALID_TERM', `term must be a string no longer than ${MAX_SEARCH_TERM_LENGTH} characters`)
           return
         }
         try {
-          const data = await searchYelpBusinesses({ lat: parseFloat(lat), lon: parseFloat(lon), term })
+          const data = await searchYelpBusinesses({ lat, lon, term })
           res.statusCode = 200
           res.end(JSON.stringify(data))
         } catch (err) {
-          res.statusCode = 502
-          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Yelp search failed' }))
+          const timedOut = isTimeout(err)
+          sendJsonError(res, timedOut ? 504 : 502, timedOut ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_ERROR', timedOut ? 'Yelp request timed out' : 'Yelp search failed')
         }
       })
     },
@@ -65,28 +85,27 @@ function transitProxyDevMiddleware(): Plugin {
     configureServer(server) {
       server.middlewares.use('/api/transit-directions', async (req, res) => {
         const url = new URL(req.url ?? '', 'http://localhost')
-        const originLat = url.searchParams.get('originLat')
-        const originLon = url.searchParams.get('originLon')
-        const destLat = url.searchParams.get('destLat')
-        const destLon = url.searchParams.get('destLon')
+        const originLat = parseCoordinate(url.searchParams.get('originLat'), -90, 90)
+        const originLon = parseCoordinate(url.searchParams.get('originLon'), -180, 180)
+        const destLat = parseCoordinate(url.searchParams.get('destLat'), -90, 90)
+        const destLon = parseCoordinate(url.searchParams.get('destLon'), -180, 180)
         res.setHeader('Content-Type', 'application/json')
-        if (!originLat || !originLon || !destLat || !destLon) {
-          res.statusCode = 400
-          res.end(JSON.stringify({ error: 'origin/dest lat/lon are required' }))
+        if (originLat === null || originLon === null || destLat === null || destLon === null) {
+          sendJsonError(res, 400, 'INVALID_COORDINATES', 'originLat, originLon, destLat, and destLon must be finite coordinates within their valid ranges')
           return
         }
         try {
           const route = await fetchTransitRoute({
-            originLat: parseFloat(originLat),
-            originLon: parseFloat(originLon),
-            destLat: parseFloat(destLat),
-            destLon: parseFloat(destLon),
+            originLat,
+            originLon,
+            destLat,
+            destLon,
           })
           res.statusCode = 200
           res.end(JSON.stringify({ route }))
         } catch (err) {
-          res.statusCode = 502
-          res.end(JSON.stringify({ error: err instanceof Error ? err.message : 'Transit directions failed' }))
+          const timedOut = isTimeout(err)
+          sendJsonError(res, timedOut ? 504 : 502, timedOut ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_ERROR', timedOut ? 'Transit directions request timed out' : 'Transit directions failed')
         }
       })
     },

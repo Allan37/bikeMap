@@ -6,6 +6,7 @@
  */
 
 const YELP_BASE_URL = "https://api.yelp.com/v3";
+const UPSTREAM_TIMEOUT_MS = 10_000;
 
 export interface YelpSearchParams {
   lat: number;
@@ -27,9 +28,20 @@ export async function searchYelpBusinesses({ lat, lon, term }: YelpSearchParams)
   });
   if (term) params.set("term", term);
 
-  const response = await fetch(`${YELP_BASE_URL}/businesses/search?${params}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${YELP_BASE_URL}/businesses/search?${params}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Upstream request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!response.ok) {
     throw new Error(`Yelp search failed: ${response.status}`);
   }

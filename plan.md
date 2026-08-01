@@ -1,4 +1,4 @@
-# bikeMap — plan (living doc, pre-code)
+# bikeMap — plan (living doc)
 
 ## Vision
 
@@ -26,12 +26,12 @@ Emphasis on staying under FREE API limits on mapbox, yelp, etc.
   `station_information.json` (static: lat/lon, capacity, name) +
   `station_status.json` (live: bikes available, docks available), refreshed
   roughly every 30-60s by Citibike/Lyft.
-- **Architecture: almost entirely client-side, plus one tiny serverless proxy.**
+- **Architecture: almost entirely client-side, plus two tiny serverless proxies.**
   Mapbox and GBFS are called directly from the browser (Mapbox tokens are
   designed to be public/URL-restricted; GBFS needs no key at all). Yelp
-  Fusion is the one exception — its API doesn't support CORS and its key
-  must stay server-side — so it's proxied through a single serverless
-  function rather than a real backend.
+  Fusion and Google transit directions use server-side API keys, so Vercel
+  functions proxy them. This is a serverless convenience layer, not a
+  persistent backend: no database, accounts, or always-on machine.
 - **Scope: single user (you), not building for others** unless that changes.
   No auth, no accounts for v1. Simplifies everything.
 - **Frontend stack: Vite + React + TypeScript**, using `vite-plugin-pwa` for
@@ -39,8 +39,10 @@ Emphasis on staying under FREE API limits on mapbox, yelp, etc.
   through this (GBFS stations, Mapbox routes, Yelp businesses, our own
   scored route options) are exactly the kind of thing worth catching at
   compile time rather than a runtime `undefined.docks_available`.
-- **POI ratings/reviews: Yelp Fusion, included from v1**, not deferred. Adds
-  the one serverless function above as a cost.
+- **POI ratings/reviews: Yelp Fusion, included from v1.**
+- **Subway routing: Google Directions transit mode, server-side only.** It
+  supplies pure-subway directions and is the transit oracle for the current
+  experimental bike + subway planner; final navigation can hand off to Apple Maps.
 - **Hosting: Vercel.** Static frontend + serverless functions (`/api` folder
   convention) with zero extra config, auto-deploys on push to GitHub, free
   tier covers this comfortably.
@@ -76,8 +78,8 @@ Washington Square Park.
 - Availability buffer: none added — `> 0` as-is. Real Directions calls per
   pair already make wrong/stale rankings cheap to get right next poll cycle;
   didn't seem worth the complexity yet.
-- Live re-routing and manual station override: still not built, still
-  reasonable v1.1+ concerns, not blocking.
+- Live re-routing and manual station override: still not built. Station data
+  refreshes on screen, but a route is recomputed only when an endpoint or mode changes.
 
 ## Phases
 
@@ -89,32 +91,25 @@ Washington Square Park.
   UI, pulsing accuracy-circle dot, continuous tracking) instead of a
   hand-rolled `hooks/useGeolocation.ts`; more robust, less code to maintain
 - [x] Installable PWA, works on your phone's home screen
-- [ ] Custom origin — right now "start" is always live GPS. Eventually want a
-  second search input ("From:") that defaults to current location but can
-  be overridden with any searched place, reusing the same SearchBar/
-  mapboxSearch infra already built for the destination. Not urgent.
-- [ ] POI ratings/reviews (Yelp) — not built yet, `search/mapboxSearch.ts`
-  covers plain place search but the `poi/` module (Yelp proxy + business
-  cards) from the architecture sketch hasn't been started
+- [x] Custom origin: a “From” picker defaults to current location and accepts
+  a searched place.
+- [x] POI ratings/reviews: the place card makes a best-effort Yelp business match.
 
-**v2 — Mixed bike + subway commutes**
-- Pull in MTA GTFS (static, for station locations/routes) + GTFS-realtime
-  (free API key, for live arrival predictions)
-- Extend the candidate-routing logic to consider subway legs as an
-  alternative or combined option (e.g. bike to a station with a dock near a
-  subway stop, ride, walk or bike the last leg)
-- This roughly doubles the "candidate combination" search space — origin
-  station × subway route/station × destination station — so the scoring
-  approach from v1 needs to generalize, not be citibike-specific
-- Real multi-modal optimization here (walk→station→bike→dropoff→walk→subway→
-  ride→walk/bike last mile, compared against pure-bike and pure-transit
-  baselines) is a proper combinatorial search, and it needs to poll/cache two
-  live feeds (GBFS + GTFS-realtime) and merge them. **Not committing to
-  "zero backend" as a permanent constraint** — v1's serverless-proxy-only
-  shape is right for v1's scope, but v2 doing this search server-side
-  (cache both feeds, run the optimization once, serve results) is likely the
-  better call rather than shipping two feeds' worth of polling and a bigger
-  search to the client. Revisit when we get there.
+**v2 — Mixed bike + subway commutes — early version built**
+- [x] Pure subway routing in-app through Google Directions transit mode.
+- [x] A bundled static subway-station dataset and a bounded heuristic planner
+  for bike-to-subway, subway-to-bike, and bike-to-subway-to-bike candidates.
+  It verifies a small number of promising candidates with Google, then uses
+  live Citibike availability and Mapbox for final bike portions.
+- [x] Draw transit polylines and bike legs together; hand off navigation to
+  Apple Maps where appropriate.
+- [ ] Add MTA GTFS static data and GTFS-realtime arrivals/service alerts only
+  if the current heuristic proves insufficient. Do not add a persistent
+  backend pre-emptively: a Vercel function with short-lived caching is the
+  first escalation if browser-side fetching, API cost, or latency becomes a
+  real problem.
+- [ ] Generalize to a configurable multimodal itinerary search only if real
+  trips demonstrate missed good options or poor ETA accuracy.
 
 **Not planned (unless priorities change)**
 - Multi-user accounts/auth
@@ -137,7 +132,7 @@ bikeMap/
     icons/                 # PWA icons (192, 512, maskable)
   api/                      # Vercel serverless functions — the ONLY server code
     yelp-search.ts           # GET /api/yelp-search?lat=&lon=&term= -> proxies Yelp
-    yelp-business.ts          # GET /api/yelp-business?id=          -> proxies Yelp
+    transit-directions.ts    # GET /api/transit-directions?... -> proxies Google transit
   src/
     main.tsx                  # entry point, mounts React root
     App.tsx                    # top-level state + layout (search -> routes -> map)
@@ -157,46 +152,46 @@ bikeMap/
       useStations.ts                  # hook: polls GBFS, returns merged live Station[]
     routing/
       mapboxDirections.ts              # getWalkingRoute(a,b), getCyclingRoute(a,b)
-      candidateSearch.ts                # findNearbyStations(), buildCandidatePairs(),
-                                         # getBestRoutes(start, end, stations)
-      scoring.ts                         # scoreCandidate() — pure function, the
-                                          # actual "algorithm", easy to unit test
+      candidateSearch.ts                # candidate station pairs + getBestRoutes()
+      scoring.ts                         # distance and fallback bike estimates
+      transitDirections.ts               # client for our transit proxy
+      multimodal.ts                      # bounded bike + subway candidate planner
+      subwayStations.ts                  # bundled static subway station lookup
     search/
-      mapboxSearch.ts                     # searchPlaces(query), retrievePlace(id)
-      SearchBar.tsx                        # input + autocomplete dropdown
+      mapboxSearch.ts                     # Mapbox Search Box suggest/retrieve
+      SearchSheet.tsx                     # destination search + saved places
+      PlaceSearch.tsx                     # reusable origin picker
     poi/
-      yelpClient.ts                         # searchNearby(lat,lon), getDetails(id)
-                                             # — calls OUR /api proxy, never Yelp direct
-      PoiCard.tsx                            # tapped-POI card: name/rating/photo/hours
+      yelpClient.ts                         # Yelp search + local best-match selection;
+                                             # calls our /api proxy, never Yelp direct
     routePanel/
-      RoutePanel.tsx                          # ranked list of RouteOption cards
-      RouteSummary.tsx                         # one option: walk/bike/walk + ETA
-    hooks/
-      useGeolocation.ts                         # wraps browser Geolocation API
-    styles/
+      TripPanel.tsx                            # place card + bike/subway/combo results
 ```
 
-**Data flow for the core interaction** (type a destination → get a route):
-`SearchBar` → `mapboxSearch.searchPlaces()` for autocomplete → user picks one
+**Data flow for bike routing** (type a destination → get a route):
+`SearchSheet` → `mapboxSearch.searchSuggestions()` for autocomplete → user picks one
 → `mapboxSearch.retrievePlace()` for coordinates → `App` calls
 `candidateSearch.getBestRoutes(userLocation, destination, liveStations)` →
-which calls `findNearbyStations()` (pure, sync, filters by live availability)
-→ `buildCandidatePairs()` → `scoring.scoreCandidate()` per pair, which calls
-`mapboxDirections` for each leg's actual walk/bike time → ranked
-`RouteOption[]` flows back up to `App`, rendered by both `RoutePanel` (list)
+which selects nearby eligible stations, evaluates every candidate pair with
+Mapbox walk/bike directions, and ranks the resulting `RouteOption[]` →
+the top option flows back up to `App`, rendered by both `TripPanel`
 and `MapView`/`routeLayer` (drawn on the map).
 
 `useStations()` runs independently on a poll interval and feeds `MapView`
 the live marker layer regardless of whether a route is active.
 
-**What's worth unit-testing:** `scoring.ts` and `candidateSearch.ts` are pure
-functions (given stations + coordinates, return ranked options) with no
-network or DOM — the actual "hard part" logic, and cheap to test with Vitest.
-Everything under `map/`, `search/`, `poi/` is mostly API-wrapper glue, lower
-value to test in isolation.
+**Current limitations worth tracking:** station eligibility currently uses
+positive bike/dock counts but does not yet incorporate a reliability buffer or
+station renting/returning flags; routing does not automatically re-plan on a
+new GBFS snapshot; and the combo planner is deliberately heuristic rather than
+a full MTA timetable graph search.
 
 ## Next steps
 
-Nothing built yet. Next conversation should probably resolve the open
-questions above (candidate count, availability buffer) and then sketch the
-actual UI flow (what's on screen, what you tap) before writing any code.
+1. Use the app for real trips and log concrete misses: unavailable bike/dock,
+   poor station choice, poor ETA, or a good bike + subway option it missed.
+2. Add focused tests around those real routing cases before broadening the
+   planner.
+3. Revisit GTFS-realtime or a cached serverless route endpoint only if those
+   misses demonstrate a need; no spare always-on laptop or persistent backend
+   is assumed.

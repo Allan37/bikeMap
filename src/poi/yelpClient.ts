@@ -23,7 +23,8 @@ export async function searchNearby(lat: number, lon: number, term?: string): Pro
 
   const response = await fetch(`/api/yelp-search?${params}`);
   if (!response.ok) {
-    throw new Error(`Yelp search failed: ${response.status}`);
+    const body = (await response.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new Error(body?.error?.message ?? `Yelp search failed: ${response.status}`);
   }
   const body = (await response.json()) as { businesses: RawYelpBusiness[] };
   return body.businesses.map((b) => ({

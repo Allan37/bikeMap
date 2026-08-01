@@ -31,8 +31,18 @@ function findNearbyStations(point: Coordinates, stations: Station[], predicate: 
  * Returns [] if no station near the start has a bike, or none near the end has a dock.
  */
 export async function getBestRoutes(start: Coordinates, end: Coordinates, stations: Station[]): Promise<RouteOption[]> {
-  const originCandidates = findNearbyStations(start, stations, (s) => (s.status?.bikesAvailable ?? 0) > 0, CANDIDATE_STATION_COUNT);
-  const destCandidates = findNearbyStations(end, stations, (s) => (s.status?.docksAvailable ?? 0) > 0, CANDIDATE_STATION_COUNT);
+  const originCandidates = findNearbyStations(
+    start,
+    stations,
+    (s) => (s.status?.bikesAvailable ?? 0) > 0 && s.status?.isRenting === true,
+    CANDIDATE_STATION_COUNT,
+  );
+  const destCandidates = findNearbyStations(
+    end,
+    stations,
+    (s) => (s.status?.docksAvailable ?? 0) > 0 && s.status?.isReturning === true,
+    CANDIDATE_STATION_COUNT,
+  );
 
   if (originCandidates.length === 0 || destCandidates.length === 0) {
     return [];

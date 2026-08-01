@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { STATION_STATUS_POLL_INTERVAL_ACTIVE_MS, STATION_STATUS_POLL_INTERVAL_IDLE_MS } from "../config";
 import type { Station, StationInfo } from "../types";
 import { fetchStationInformation, fetchStationStatus, mergeStations } from "./gbfs";
@@ -19,29 +19,51 @@ export function useStations(isActive: boolean): UseStationsResult {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const infoRef = useRef<StationInfo[]>([]);
-  // Lazily created once and reused across re-renders/effect restarts — station info is
-  // fetched exactly once regardless of how many times `isActive` toggles.
   const infoPromiseRef = useRef<Promise<StationInfo[]> | null>(null);
-  if (!infoPromiseRef.current) {
-    infoPromiseRef.current = fetchStationInformation().then((info) => {
-      infoRef.current = info;
-      return info;
-    });
-  }
+
+  /** Shares a successful static-data request, but clears a failed one so the next poll retries it. */
+  const getStationInformation = useCallback((): Promise<StationInfo[]> => {
+    if (infoRef.current.length > 0) return Promise.resolve(infoRef.current);
+    if (!infoPromiseRef.current) {
+      infoPromiseRef.current = fetchStationInformation()
+        .then((info) => {
+          infoRef.current = info;
+          return info;
+        })
+        .catch((error: unknown) => {
+          infoPromiseRef.current = null;
+          throw error;
+        });
+    }
+    return infoPromiseRef.current;
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
+    let inFlight = false;
+    let statusController: AbortController | null = null;
 
     async function pollStatus() {
+      // setInterval does not wait for an async request. Skip a tick rather than downloading
+      // concurrent copies of the same ~1 MB status feed on a slow mobile connection.
+      if (inFlight) return;
+      inFlight = true;
+      statusController = new AbortController();
       try {
-        await infoPromiseRef.current; // no-op once already resolved
-        const status = await fetchStationStatus();
+        await getStationInformation(); // no-op once static data is already available
+        const snapshot = await fetchStationStatus(statusController.signal);
         if (cancelled) return;
-        setStations(mergeStations(infoRef.current, status));
-        setLastUpdated(new Date());
+        setStations(mergeStations(infoRef.current, snapshot.stations));
+        setLastUpdated(snapshot.lastUpdated ?? new Date());
         setError(null);
       } catch (err) {
-        if (!cancelled) setError((err as Error).message);
+        // Effect cleanup aborts an obsolete poll; that is not a user-visible station-data error.
+        if (!cancelled && !(err instanceof DOMException && err.name === "AbortError")) {
+          setError(err instanceof Error ? err.message : "Citibike data request failed");
+        }
+      } finally {
+        inFlight = false;
+        statusController = null;
       }
     }
 
@@ -54,8 +76,9 @@ export function useStations(isActive: boolean): UseStationsResult {
     return () => {
       cancelled = true;
       clearInterval(intervalId);
+      statusController?.abort();
     };
-  }, [isActive]);
+  }, [isActive, getStationInformation]);
 
   return { stations, lastUpdated, error };
 }

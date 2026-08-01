@@ -5,6 +5,9 @@
  * The Google Maps Platform key isn't safe client-side, so this only ever runs server-side.
  */
 const DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json";
+const UPSTREAM_TIMEOUT_MS = 10_000;
+const TRANSIT_CACHE_TTL_MS = 60_000;
+const routeCache = new Map<string, { expiresAt: number; route: TransitRoute | null }>();
 
 export interface TransitQuery {
   originLat: number;
@@ -38,6 +41,10 @@ export interface TransitRoute {
   steps: TransitStep[];
 }
 
+function routeCacheKey(q: TransitQuery): string {
+  return [q.originLat, q.originLon, q.destLat, q.destLon].map((n) => n.toFixed(5)).join(",");
+}
+
 function stripHtml(s: string): string {
   return s
     .replace(/<[^>]*>/g, " ")
@@ -46,6 +53,11 @@ function stripHtml(s: string): string {
 }
 
 export async function fetchTransitRoute(q: TransitQuery): Promise<TransitRoute | null> {
+  const cacheKey = routeCacheKey(q);
+  const cached = routeCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.route;
+  routeCache.delete(cacheKey);
+
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) throw new Error("GOOGLE_MAPS_API_KEY is not configured on the server");
 
@@ -56,14 +68,30 @@ export async function fetchTransitRoute(q: TransitQuery): Promise<TransitRoute |
     transit_mode: "subway|train|tram",
     key,
   });
-  const response = await fetch(`${DIRECTIONS_URL}?${params}`);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
+  let response: Response;
+  try {
+    response = await fetch(`${DIRECTIONS_URL}?${params}`, { signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error("Upstream request timed out");
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
   if (!response.ok) throw new Error(`Directions request failed: ${response.status}`);
 
   // biome-ignore lint/suspicious/noExplicitAny: Google's response is deeply nested and untyped here.
   const data = (await response.json()) as any;
-  if (data.status !== "OK") return null;
+  if (data.status !== "OK") {
+    routeCache.set(cacheKey, { route: null, expiresAt: Date.now() + TRANSIT_CACHE_TTL_MS });
+    return null;
+  }
   const leg = data.routes?.[0]?.legs?.[0];
-  if (!leg) return null;
+  if (!leg) {
+    routeCache.set(cacheKey, { route: null, expiresAt: Date.now() + TRANSIT_CACHE_TTL_MS });
+    return null;
+  }
 
   // biome-ignore lint/suspicious/noExplicitAny: see above.
   const steps: TransitStep[] = (leg.steps ?? []).map((s: any) => {
@@ -96,10 +124,12 @@ export async function fetchTransitRoute(q: TransitQuery): Promise<TransitRoute |
     };
   });
 
-  return {
+  const route = {
     totalDurationSeconds: leg.duration?.value ?? 0,
     departureText: leg.departure_time?.text ?? null,
     arrivalText: leg.arrival_time?.text ?? null,
     steps,
   };
+  routeCache.set(cacheKey, { route, expiresAt: Date.now() + TRANSIT_CACHE_TTL_MS });
+  return route;
 }
